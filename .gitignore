@@ -1,0 +1,17 @@
+__pycache__/
+*.pyc
+.venv/
+.venv311/
+.venv_py314_backup/
+.env
+.DS_Store
+
+# Data artifacts
+data/*
+!data/.gitkeep
+
+# Chroma persistence
+chroma/
+
+# Streamlit
+.streamlit/

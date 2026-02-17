@@ -1,0 +1,25 @@
+{
+  "features": [
+    "speed",
+    "speed_estimated_kn",
+    "acceleration_kn_per_h",
+    "course_change_deg",
+    "course_change_rate_deg_per_h",
+    "delta_distance_km",
+    "delta_time_s",
+    "speed_roll_std_3",
+    "speed_roll_std_5",
+    "speed_roll_std_10"
+  ],
+  "thresholds": {
+    "speed_spike_acc_kn_per_h": 12.000000000000028,
+    "course_jitter_deg": 125.10000000000001,
+    "position_jump_km": 80.0,
+    "max_jump_window_minutes": 30.0
+  },
+  "score_quantiles": {
+    "q01": -0.6536819667151258,
+    "q05": -0.5577743401271459,
+    "q50": -0.352642242011676
+  }
+}

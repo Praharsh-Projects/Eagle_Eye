@@ -1,0 +1,11 @@
+{
+  "skipped": false,
+  "mae_minutes": 1347.5400757550697,
+  "rmse_minutes": 2295.35810189473,
+  "median_absolute_error_minutes": 801.7136823411014,
+  "train_rows": 120000,
+  "test_rows": 30000,
+  "model_kind": "histgb",
+  "max_train_rows": 120000,
+  "max_test_rows": 30000
+}

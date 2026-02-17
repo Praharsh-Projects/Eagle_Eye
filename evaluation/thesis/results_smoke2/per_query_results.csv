@@ -1,0 +1,37 @@
+strategy,query,hit,latency_ms,retrieved_count,hallucinated
+A,How many tanker arrivals were recorded at LVVNT on 2021-01-01?,True,110.3001670003323,3,False
+A,Describe vessel arrivals at Ventspils (LVVNT) on 2021-01-01 and mention dwell anomalies.,True,31.102208999982395,3,False
+A,Was LUBECK busy in March 2022 based on arrivals and dwell?,False,29.508083000109764,0,False
+A,Show anomaly-flagged events near GDANSK in February 2021.,False,34.24666699993395,0,False
+A,What happened at SEGOT on 2021-02-03 in terms of vessel arrivals?,False,11.000375000094209,0,False
+A,List AIS incident-like position jumps for MMSI events around 2021-01-01.,True,40.50270800007638,5,False
+A,Give a port-day summary for LVVNT on 2021-01-02.,False,7.837791999918409,0,False
+A,Were there unusual dwell-time outliers at LVVNT during January 2021?,True,8.611875000042346,2,False
+A,Provide evidence about cargo ship traffic to LUBECK between 2021-01-01 and 2021-01-03.,True,29.778416999761248,5,False
+A,Summarize route activity from LVVNT to SEKOG style destinations in early 2021.,True,26.91637499992794,5,False
+A,What evidence indicates congestion pressure at LVVNT on Fridays in 2021?,True,31.14004200006093,5,False
+A,Show representative tanker-related events for LVVNT around 2021-01-03.,True,11.312000000089029,2,False
+B,How many tanker arrivals were recorded at LVVNT on 2021-01-01?,False,17.18979199995374,0,False
+B,Describe vessel arrivals at Ventspils (LVVNT) on 2021-01-01 and mention dwell anomalies.,True,5.505290999735735,1,False
+B,Was LUBECK busy in March 2022 based on arrivals and dwell?,False,6.277916000271944,0,False
+B,Show anomaly-flagged events near GDANSK in February 2021.,False,5.616667000140296,0,False
+B,What happened at SEGOT on 2021-02-03 in terms of vessel arrivals?,False,5.988917000195215,0,False
+B,List AIS incident-like position jumps for MMSI events around 2021-01-01.,True,9.067250000043714,5,False
+B,Give a port-day summary for LVVNT on 2021-01-02.,False,5.997750000005908,0,False
+B,Were there unusual dwell-time outliers at LVVNT during January 2021?,True,7.4367080001138675,2,False
+B,Provide evidence about cargo ship traffic to LUBECK between 2021-01-01 and 2021-01-03.,False,6.6891659998873365,0,False
+B,Summarize route activity from LVVNT to SEKOG style destinations in early 2021.,True,6.6754589997799485,3,False
+B,What evidence indicates congestion pressure at LVVNT on Fridays in 2021?,True,6.534166999699664,3,False
+B,Show representative tanker-related events for LVVNT around 2021-01-03.,False,4.913458999908471,0,False
+C,How many tanker arrivals were recorded at LVVNT on 2021-01-01?,False,12.07612500002142,0,False
+C,Describe vessel arrivals at Ventspils (LVVNT) on 2021-01-01 and mention dwell anomalies.,True,5.021958000270388,1,False
+C,Was LUBECK busy in March 2022 based on arrivals and dwell?,False,5.909749999773339,0,False
+C,Show anomaly-flagged events near GDANSK in February 2021.,False,6.661249999979191,0,False
+C,What happened at SEGOT on 2021-02-03 in terms of vessel arrivals?,False,5.692959000043629,0,False
+C,List AIS incident-like position jumps for MMSI events around 2021-01-01.,True,8.790500000031898,5,False
+C,Give a port-day summary for LVVNT on 2021-01-02.,False,6.663957999990089,0,False
+C,Were there unusual dwell-time outliers at LVVNT during January 2021?,True,7.672374999856402,1,False
+C,Provide evidence about cargo ship traffic to LUBECK between 2021-01-01 and 2021-01-03.,False,6.731375000072148,0,False
+C,Summarize route activity from LVVNT to SEKOG style destinations in early 2021.,True,5.8067499999197025,2,False
+C,What evidence indicates congestion pressure at LVVNT on Fridays in 2021?,True,6.71979199978523,2,False
+C,Show representative tanker-related events for LVVNT around 2021-01-03.,False,7.585500000004686,0,False

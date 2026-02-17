@@ -1,0 +1,32 @@
+{
+  "top_k": 5,
+  "strategies": {
+    "A": {
+      "hit_at_k": 0.6667,
+      "queries": 12,
+      "mean_latency_ms": 31.021,
+      "hallucination_rate": 0.0,
+      "index_chunks": 1000,
+      "index_size_mb": 8.691,
+      "embedding_model": "sentence-transformers/all-MiniLM-L6-v2"
+    },
+    "B": {
+      "hit_at_k": 0.4167,
+      "queries": 12,
+      "mean_latency_ms": 7.324,
+      "hallucination_rate": 0.0,
+      "index_chunks": 260,
+      "index_size_mb": 8.852,
+      "embedding_model": "sentence-transformers/all-MiniLM-L6-v2"
+    },
+    "C": {
+      "hit_at_k": 0.4167,
+      "queries": 12,
+      "mean_latency_ms": 7.111,
+      "hallucination_rate": 0.0,
+      "index_chunks": 147,
+      "index_size_mb": 9.013,
+      "embedding_model": "sentence-transformers/all-MiniLM-L6-v2"
+    }
+  }
+}

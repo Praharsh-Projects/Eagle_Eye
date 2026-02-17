@@ -1,0 +1,39 @@
+{
+  "numeric_features": [
+    "latitude",
+    "longitude",
+    "speed",
+    "course",
+    "heading",
+    "draught",
+    "delta_time_s",
+    "delta_distance_km",
+    "speed_estimated_kn",
+    "acceleration_kn_per_h",
+    "course_change_deg",
+    "course_change_rate_deg_per_h",
+    "speed_roll_mean_3",
+    "speed_roll_std_3",
+    "speed_roll_mean_5",
+    "speed_roll_std_5",
+    "speed_roll_mean_10",
+    "speed_roll_std_10",
+    "speed_est_roll_mean_5",
+    "speed_est_roll_mean_10",
+    "course_change_roll_mean_5",
+    "course_change_roll_mean_10",
+    "hour_of_day",
+    "day_of_week"
+  ],
+  "categorical_features": [
+    "vessel_type_norm",
+    "flag_norm",
+    "nav_status_norm"
+  ],
+  "target": "eta_minutes_label",
+  "model_kind": "histgb",
+  "train_rows": 120000,
+  "test_rows": 30000,
+  "max_train_rows": 120000,
+  "max_test_rows": 30000
+}
