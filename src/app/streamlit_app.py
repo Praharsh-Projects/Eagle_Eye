@@ -1,25 +1,48 @@
-"""Streamlit app for deterministic analytics + forecast with optional RAG evidence."""
+"""Simplified Ask-only Streamlit app with integrated future prediction."""
 
 from __future__ import annotations
 
-import json
+import time
 import os
 import re
-import sys
+from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple, Union
 
 import pandas as pd
 import streamlit as st
+try:
+    import altair as alt
+except Exception:  # pragma: no cover - optional visualization dependency
+    alt = None
 
-from src.forecast.backtest import run_backtest
 from src.forecast.forecast import ForecastEngine, ForecastResult
 from src.kpi.query import AnalyticsResult, KPIQueryEngine
-from src.qa.intent import IntentResult, classify_question, describe_intent, required_data_for_intent
+from src.qa.intent import IntentResult, classify_question
 from src.rag.retriever import QueryFilters, RAGRetriever
 from src.utils.config import load_config
-from src.utils.runtime import import_chromadb
 from src.utils.serialization import compact_traffic_evidence
+
+
+SAMPLE_QUERIES = [
+    "How many vessel arrivals were recorded at SEGOT in March 2022?",
+    "Which weekday is usually busiest at LVVNT?",
+    "Compare Friday and Monday arrivals at GDANSK in March 2022.",
+    "Show suspicious AIS jumps for MMSI 212575000 on 2021-01-01.",
+    "For MMSI 266232000, summarize movement and destination changes on 2021-01-01.",
+    "What will congestion be at LVVNT on Friday, February 20, 2026?",
+    "Predict congestion for SEGOT next Friday based on historical patterns.",
+    "Expected congestion at GDANSK on 2026-03-06?",
+    "Compare expected congestion next Friday between LVVNT and SEGOT.",
+    "Predict whether LUBECK is likely high congestion on 2026-02-20.",
+]
+
+
+@dataclass
+class EvidenceBundle:
+    lines: List[str]
+    rows: List[Dict[str, Any]]
+    trace: Dict[str, Any]
 
 
 @st.cache_resource
@@ -37,136 +60,42 @@ def _init_retriever(persist_dir: str, config_path: str) -> RAGRetriever:
     return RAGRetriever(persist_dir=persist_dir, config_path=config_path)
 
 
-def _read_json(path: Path) -> Dict[str, Any]:
-    if not path.exists():
-        return {}
-    with path.open("r", encoding="utf-8") as f:
-        return json.load(f)
+def _parse_anomaly_filter(value: str) -> Optional[bool]:
+    lowered = value.strip().lower()
+    if lowered == "true":
+        return True
+    if lowered == "false":
+        return False
+    return None
 
 
-def _render_diagnostics(
-    config: Dict[str, Any],
-    persist_dir: str,
-    processed_dir: Path,
-    model_dir: Path,
-    kpi_engine: Optional[KPIQueryEngine],
-) -> None:
-    with st.expander("Diagnostics", expanded=True):
-        st.write(f"Python: `{sys.executable}` ({sys.version.split()[0]})")
-        st.write(f"CWD: `{os.getcwd()}`")
-        st.write(f"OPENAI_API_KEY set: `{bool(os.getenv('OPENAI_API_KEY'))}`")
-        st.write(f"Configured embedding model: `{config['models']['embedding_model']}`")
-
-        st.write(f"Persist dir exists: `{Path(persist_dir).exists()}`")
-        st.write(f"Processed dir exists: `{processed_dir.exists()}`")
-
-        required_kpi = [
-            "arrivals_daily.parquet",
-            "arrivals_hourly.parquet",
-            "dwell_time.parquet",
-            "occupancy_hourly.parquet",
-            "congestion_daily.parquet",
-        ]
-        for file_name in required_kpi:
-            st.write(f"{file_name}: `{(processed_dir / file_name).exists()}`")
-
-        st.write(
-            "Prediction model files: "
-            f"destination=`{(model_dir / 'destination_model.pkl').exists()}`, "
-            f"eta=`{(model_dir / 'eta_model.pkl').exists()}`, "
-            f"anomaly=`{(model_dir / 'anomaly_model.pkl').exists()}`"
-        )
-
-        if kpi_engine is not None:
-            caps = kpi_engine.capabilities()
-            st.write("KPI capabilities:")
-            st.json(caps)
-
-        if Path(persist_dir).exists():
-            try:
-                chromadb = import_chromadb()
-                client = chromadb.PersistentClient(path=str(Path(persist_dir)))
-                traffic = client.get_or_create_collection(name=config["index"]["traffic_collection"]).count()
-                docs = client.get_or_create_collection(name=config["index"]["docs_collection"]).count()
-                st.write(f"traffic_events.count() = `{traffic}`")
-                st.write(f"docs_chunks.count() = `{docs}`")
-            except Exception as exc:
-                st.warning(f"Could not inspect Chroma collections: {exc}")
+def _pick_filter(override: Optional[str], extracted: Optional[str]) -> Optional[str]:
+    if override is not None and override.strip():
+        return override.strip()
+    if extracted is not None and str(extracted).strip():
+        return str(extracted).strip()
+    return None
 
 
-def _render_analytics_result(result: AnalyticsResult) -> None:
-    st.subheader("Answer")
-    st.write(result.answer)
+def _make_rag_filters(
+    entities: Dict[str, Any],
+    overrides: Dict[str, Any],
+    include_dates: bool = True,
+) -> QueryFilters:
+    port_token = _pick_filter(overrides.get("port"), entities.get("port"))
 
-    if result.coverage_notes:
-        st.subheader("Coverage Notes")
-        for note in result.coverage_notes:
-            st.markdown(f"- {note}")
-
-    if result.caveats:
-        st.subheader("Caveats")
-        for caveat in result.caveats:
-            st.markdown(f"- {caveat}")
-
-    if result.chart is not None and not result.chart.empty:
-        st.subheader("Chart")
-        chart_df = result.chart.copy()
-        if isinstance(chart_df.index, pd.DatetimeIndex):
-            chart_df.index = chart_df.index.tz_convert("UTC").tz_localize(None)
-        st.line_chart(chart_df)
-
-    if result.table is not None and not result.table.empty:
-        st.subheader("Data")
-        st.dataframe(result.table)
-
-
-def _render_forecast_result(result: ForecastResult) -> None:
-    st.subheader("Forecast Answer")
-    st.write(result.answer)
-
-    if result.coverage_notes:
-        st.subheader("Coverage Notes")
-        for note in result.coverage_notes:
-            st.markdown(f"- {note}")
-
-    if result.caveats:
-        st.subheader("Caveats")
-        for caveat in result.caveats:
-            st.markdown(f"- {caveat}")
-
-    if result.history is not None and not result.history.empty:
-        history = result.history.copy()
-        history = history.rename(columns={"actual": "history_actual"})
-        if "date" in history.columns:
-            history["date"] = pd.to_datetime(history["date"], errors="coerce", utc=True).dt.tz_localize(None)
-            history = history.set_index("date")
-
-        if result.forecast is not None and not result.forecast.empty:
-            forecast = result.forecast.copy()
-            forecast["date"] = pd.to_datetime(forecast["date"], errors="coerce", utc=True).dt.tz_localize(None)
-            forecast = forecast.set_index("date")
-            merged = history.join(forecast[["predicted", "lower", "upper"]], how="outer")
-            st.subheader("Forecast Chart")
-            st.line_chart(merged)
-            st.subheader("Forecast Points")
-            st.dataframe(forecast.reset_index())
-        else:
-            st.subheader("History")
-            st.line_chart(history)
-
-
-def _make_rag_filters(entities: Dict[str, Any]) -> QueryFilters:
-    port = entities.get("port")
     locode = None
     destination = None
     port_name = None
-    if isinstance(port, str) and port.strip():
-        token = port.strip()
-        if re.fullmatch(r"[A-Za-z]{2}\s?[A-Za-z]{3}", token):
-            locode = token
+    if port_token:
+        if re.fullmatch(r"[A-Za-z]{2}\s?[A-Za-z]{3}", port_token):
+            locode = port_token
         else:
-            destination = token
-            port_name = token
+            destination = port_token
+            port_name = port_token
+
+    date_from = _pick_filter(overrides.get("date_from"), entities.get("date_from")) if include_dates else None
+    date_to = _pick_filter(overrides.get("date_to"), entities.get("date_to")) if include_dates else None
 
     return QueryFilters(
         mmsi=entities.get("mmsi"),
@@ -174,30 +103,203 @@ def _make_rag_filters(entities: Dict[str, Any]) -> QueryFilters:
         locode=locode,
         port_name=port_name,
         destination=destination,
-        vessel_type=entities.get("vessel_type"),
-        date_from=entities.get("date_from"),
-        date_to=entities.get("date_to"),
+        vessel_type=_pick_filter(overrides.get("vessel_type"), entities.get("vessel_type")),
+        date_from=date_from,
+        date_to=date_to,
     )
 
 
-def _retrieve_diagnostic_evidence(
+def _retrieve_evidence(
     retriever: Optional[RAGRetriever],
     question: str,
     entities: Dict[str, Any],
+    overrides: Dict[str, Any],
     top_k: int,
-) -> List[str]:
+    include_dates: bool,
+) -> EvidenceBundle:
+    empty = EvidenceBundle(lines=[], rows=[], trace={})
     if retriever is None:
-        return []
+        return empty
+
     try:
-        filters = _make_rag_filters(entities)
+        filters = _make_rag_filters(entities=entities, overrides=overrides, include_dates=include_dates)
+        started = time.perf_counter()
         result = retriever.query_traffic(question=question, filters=filters, top_k=top_k)
-    except Exception as exc:
-        return [f"RAG evidence unavailable: {exc}"]
+        latency_ms = (time.perf_counter() - started) * 1000.0
+    except Exception:
+        return empty
 
     lines: List[str] = []
+    rows: List[Dict[str, Any]] = []
     for item in result.evidence[:top_k]:
-        lines.append(f"`{item.id}` | {compact_traffic_evidence(item.metadata, item.text)}")
-    return lines
+        chunk_id = str(
+            item.metadata.get("chunk_id")
+            or item.metadata.get("stable_id")
+            or item.metadata.get("id")
+            or ""
+        )
+        dist_txt = f"{float(item.distance):.4f}" if item.distance is not None else "n/a"
+        lines.append(
+            f"`vector_id={item.id}` | `chunk_id={chunk_id or 'n/a'}` | `dist={dist_txt}` | "
+            f"{compact_traffic_evidence(item.metadata, item.text)}"
+        )
+        rows.append(
+            {
+                "vector_id": item.id,
+                "chunk_id": chunk_id or None,
+                "distance": item.distance,
+                "timestamp": item.metadata.get("timestamp_full") or item.metadata.get("date"),
+                "port": item.metadata.get("locode_norm")
+                or item.metadata.get("locode")
+                or item.metadata.get("port_name")
+                or item.metadata.get("destination_norm"),
+                "vessel_type": item.metadata.get("vessel_type_norm")
+                or item.metadata.get("vessel_type"),
+                "mmsi": item.metadata.get("mmsi"),
+            }
+        )
+
+    active_filters = {
+        key: value
+        for key, value in {
+            "mmsi": filters.mmsi,
+            "imo": filters.imo,
+            "locode": filters.locode,
+            "port_name": filters.port_name,
+            "destination": filters.destination,
+            "vessel_type": filters.vessel_type,
+            "date_from": filters.date_from,
+            "date_to": filters.date_to,
+            "lat_min": filters.lat_min,
+            "lat_max": filters.lat_max,
+            "lon_min": filters.lon_min,
+            "lon_max": filters.lon_max,
+        }.items()
+        if value not in (None, "", [])
+    }
+
+    trace = {
+        "mode": result.mode,
+        "query_latency_ms": round(latency_ms, 2),
+        "returned_items": len(result.evidence),
+        "top_k_requested": top_k,
+        "where_filter": result.where_filter,
+        "active_filters": active_filters,
+    }
+    return EvidenceBundle(lines=lines, rows=rows, trace=trace)
+
+
+def _extract_prediction_triplet(
+    result: ForecastResult,
+    target_date: Optional[str],
+    target_dow: Optional[str],
+) -> Optional[Tuple[float, float, float]]:
+    if result.forecast is None or result.forecast.empty:
+        return None
+
+    df = result.forecast.copy()
+    if "date" not in df.columns:
+        return None
+
+    df["date"] = pd.to_datetime(df["date"], errors="coerce", utc=True).dt.floor("D")
+    rows = df.dropna(subset=["date"])
+
+    if target_date:
+        target_ts = pd.to_datetime(target_date, errors="coerce", utc=True)
+        if pd.notna(target_ts):
+            target_ts = pd.Timestamp(target_ts).floor("D")
+            picked = rows[rows["date"] == target_ts]
+            if picked.empty:
+                picked = rows.tail(1)
+            return (
+                float(picked["predicted"].mean()),
+                float(picked["lower"].mean()),
+                float(picked["upper"].mean()),
+            )
+
+    if target_dow:
+        dow_rows = rows[rows["date"].dt.day_name() == target_dow.title()]
+        if dow_rows.empty:
+            dow_rows = rows.tail(1)
+        return (
+            float(dow_rows["predicted"].mean()),
+            float(dow_rows["lower"].mean()),
+            float(dow_rows["upper"].mean()),
+        )
+
+    tail = rows.tail(1)
+    return (
+        float(tail["predicted"].mean()),
+        float(tail["lower"].mean()),
+        float(tail["upper"].mean()),
+    )
+
+
+def _compare_forecast_ports(
+    forecaster: ForecastEngine,
+    ports: List[str],
+    target_date: Optional[str],
+    target_dow: Optional[str],
+    horizon_weeks: int,
+) -> AnalyticsResult:
+    unique_ports = []
+    for port in ports:
+        token = str(port).strip()
+        if token and token not in unique_ports:
+            unique_ports.append(token)
+
+    if len(unique_ports) < 2:
+        return KPIQueryEngine.no_data("Comparison forecast needs at least two distinct ports in the question.")
+
+    p1, p2 = unique_ports[0], unique_ports[1]
+
+    if target_date:
+        r1 = forecaster.forecast_congestion_for_date(port=p1, target_date=target_date, horizon_weeks=horizon_weeks)
+        r2 = forecaster.forecast_congestion_for_date(port=p2, target_date=target_date, horizon_weeks=horizon_weeks)
+    else:
+        r1 = forecaster.forecast_congestion(port=p1, target_dow=target_dow or "Friday", horizon_weeks=horizon_weeks)
+        r2 = forecaster.forecast_congestion(port=p2, target_dow=target_dow or "Friday", horizon_weeks=horizon_weeks)
+
+    t1 = _extract_prediction_triplet(r1, target_date=target_date, target_dow=target_dow)
+    t2 = _extract_prediction_triplet(r2, target_date=target_date, target_dow=target_dow)
+    if t1 is None or t2 is None:
+        return KPIQueryEngine.no_data("Could not compute comparison forecast due to missing forecast outputs.")
+
+    p1_pred, p1_low, p1_high = t1
+    p2_pred, p2_low, p2_high = t2
+    higher = p1 if p1_pred >= p2_pred else p2
+
+    target_label = target_date or (target_dow or "selected period")
+    answer = (
+        f"Predicted congestion comparison for {target_label}: {p1}={p1_pred:.2f} ({p1_low:.2f}-{p1_high:.2f}) vs "
+        f"{p2}={p2_pred:.2f} ({p2_low:.2f}-{p2_high:.2f}). {higher} is likely higher."
+    )
+
+    table = pd.DataFrame(
+        [
+            {"port": p1, "predicted": p1_pred, "lower": p1_low, "upper": p1_high},
+            {"port": p2, "predicted": p2_pred, "lower": p2_low, "upper": p2_high},
+        ]
+    )
+
+    coverage_notes = [f"Target: {target_label}", "Method: per-port congestion forecast followed by direct comparison."]
+    for item in (r1.coverage_notes + r2.coverage_notes):
+        if item not in coverage_notes:
+            coverage_notes.append(item)
+
+    caveats: List[str] = []
+    for item in (r1.caveats + r2.caveats):
+        if item not in caveats:
+            caveats.append(item)
+
+    return AnalyticsResult(
+        status="ok",
+        answer=answer,
+        table=table,
+        chart=table.set_index("port")[["predicted"]],
+        coverage_notes=coverage_notes,
+        caveats=caveats[:6],
+    )
 
 
 def _handle_ask_question(
@@ -207,333 +309,555 @@ def _handle_ask_question(
     forecaster: ForecastEngine,
     retriever: Optional[RAGRetriever],
     top_k_evidence: int,
-) -> tuple[AnalyticsResult | ForecastResult, List[str]]:
+    user_filters: Dict[str, Any],
+) -> tuple[Union[AnalyticsResult, ForecastResult], EvidenceBundle]:
     entities = intent_result.entities
-    port = entities.get("port")
-    ports = entities.get("ports") or []
-    start = entities.get("date_from")
-    end = entities.get("date_to")
-    vessel_type = entities.get("vessel_type")
+    q_lower = question.lower()
+
+    port = _pick_filter(user_filters.get("port"), entities.get("port"))
+    start = _pick_filter(user_filters.get("date_from"), entities.get("date_from"))
+    end = _pick_filter(user_filters.get("date_to"), entities.get("date_to"))
+    vessel_type = _pick_filter(user_filters.get("vessel_type"), entities.get("vessel_type"))
     dow = entities.get("dow")
+    target_date = entities.get("target_date")
     window = entities.get("window")
     metric = entities.get("metric", "arrivals_vessels")
+    horizon_weeks = int(entities.get("horizon_weeks") or 4)
+
+    ports: List[str] = [str(p).strip() for p in entities.get("ports") or [] if str(p).strip()]
+    if port and port not in ports:
+        ports.insert(0, port)
 
     if intent_result.intent == "G":
         return (
             KPIQueryEngine.unsupported(
                 "This question needs terminal operations data (berth/crane/TEU/gate), which is not in PRJ912/PRJ896."
             ),
-            [],
+            EvidenceBundle(lines=[], rows=[], trace={}),
         )
 
     if intent_result.intent == "A":
-        q = question.lower()
-        if "top" in q and "port" in q:
-            return (
-                kpi.top_ports_by_arrivals(start=start, end=end, vessel_type=vessel_type, dow=dow),
-                [],
-            )
-        if "dwell" in q:
-            return (
-                kpi.get_avg_dwell_time(port=port, start=start, end=end, vessel_type=vessel_type, dow=dow),
-                [],
-            )
-        if "congestion" in q:
-            return (
-                kpi.get_congestion(port=port, start=start, end=end, dow=dow, window=window),
-                [],
-            )
-        return (
-            kpi.get_arrivals(port=port, start=start, end=end, vessel_type=vessel_type, dow=dow, window=window),
-            [],
+        if "top" in q_lower and "port" in q_lower:
+            result = kpi.top_ports_by_arrivals(start=start, end=end, vessel_type=vessel_type, dow=dow)
+        elif "dwell" in q_lower:
+            result = kpi.get_avg_dwell_time(port=port, start=start, end=end, vessel_type=vessel_type, dow=dow)
+        elif "congestion" in q_lower:
+            result = kpi.get_congestion(port=port, start=start, end=end, dow=dow, window=window)
+        else:
+            result = kpi.get_arrivals(port=port, start=start, end=end, vessel_type=vessel_type, dow=dow, window=window)
+        evidence = _retrieve_evidence(
+            retriever=retriever,
+            question=question,
+            entities=entities,
+            overrides=user_filters,
+            top_k=top_k_evidence,
+            include_dates=True,
         )
+        return result, evidence
 
     if intent_result.intent == "B":
         if entities.get("dow") and entities.get("dow_compare"):
-            return (
-                kpi.compare_weekdays(
-                    port=port,
-                    start=start,
-                    end=end,
-                    day_a=entities["dow"],
-                    day_b=entities["dow_compare"],
-                    vessel_type=vessel_type,
-                ),
-                [],
-            )
-        if "hour" in question.lower():
-            return (
-                kpi.get_busiest_hour(port=port, start=start, end=end, vessel_type=vessel_type),
-                [],
-            )
-        return (
-            kpi.get_busiest_dow(port=port, start=start, end=end, vessel_type=vessel_type),
-            [],
-        )
-
-    if intent_result.intent == "C":
-        return (
-            forecaster.forecast_congestion(
-                port=port or "",
-                target_dow=dow or "Friday",
-                horizon_weeks=int(entities.get("horizon_weeks") or 4),
-            ),
-            [],
-        )
-
-    if intent_result.intent == "D":
-        return (
-            kpi.compare_ports(
-                ports=ports,
-                metric=metric,
+            result = kpi.compare_weekdays(
+                port=port,
                 start=start,
                 end=end,
+                day_a=entities["dow"],
+                day_b=entities["dow_compare"],
                 vessel_type=vessel_type,
-                dow=dow,
-            ),
-            [],
+            )
+        elif "hour" in q_lower:
+            result = kpi.get_busiest_hour(port=port, start=start, end=end, vessel_type=vessel_type)
+        else:
+            result = kpi.get_busiest_dow(port=port, start=start, end=end, vessel_type=vessel_type)
+
+        evidence = _retrieve_evidence(
+            retriever=retriever,
+            question=question,
+            entities=entities,
+            overrides=user_filters,
+            top_k=top_k_evidence,
+            include_dates=True,
         )
+        return result, evidence
+
+    if intent_result.intent == "C":
+        if len(ports) >= 2 and any(token in q_lower for token in ("compare", "vs", "versus", "more than", "less than")):
+            result = _compare_forecast_ports(
+                forecaster=forecaster,
+                ports=ports,
+                target_date=target_date,
+                target_dow=dow,
+                horizon_weeks=horizon_weeks,
+            )
+            evidence = _retrieve_evidence(
+                retriever=retriever,
+                question=question,
+                entities=entities,
+                overrides=user_filters,
+                top_k=top_k_evidence,
+                include_dates=False,
+            )
+            return result, evidence
+
+        if target_date:
+            result = forecaster.forecast_congestion_for_date(
+                port=port or "",
+                target_date=target_date,
+                horizon_weeks=horizon_weeks,
+            )
+        else:
+            result = forecaster.forecast_congestion(
+                port=port or "",
+                target_dow=dow or "Friday",
+                horizon_weeks=horizon_weeks,
+            )
+
+        evidence = _retrieve_evidence(
+            retriever=retriever,
+            question=question,
+            entities=entities,
+            overrides=user_filters,
+            top_k=top_k_evidence,
+            include_dates=False,
+        )
+        return result, evidence
+
+    if intent_result.intent == "D":
+        result = kpi.compare_ports(
+            ports=ports,
+            metric=metric,
+            start=start,
+            end=end,
+            vessel_type=vessel_type,
+            dow=dow,
+        )
+        evidence = _retrieve_evidence(
+            retriever=retriever,
+            question=question,
+            entities=entities,
+            overrides=user_filters,
+            top_k=top_k_evidence,
+            include_dates=True,
+        )
+        return result, evidence
 
     if intent_result.intent == "E":
-        if not start and not end:
-            # If no explicit date, use last date from congestion table.
-            if not kpi.congestion.empty:
-                latest = pd.to_datetime(kpi.congestion["date"], errors="coerce", utc=True).max()
-                if pd.notna(latest):
-                    start = end = latest.strftime("%Y-%m-%d")
-        target_date = start or end
-        analytics = kpi.diagnose_congestion(port=port, target_date=target_date)
-        evidence = _retrieve_diagnostic_evidence(retriever, question, entities, top_k=top_k_evidence)
-        return analytics, evidence
+        if not start and not end and not kpi.congestion.empty:
+            latest = pd.to_datetime(kpi.congestion["date"], errors="coerce", utc=True).max()
+            if pd.notna(latest):
+                start = end = latest.strftime("%Y-%m-%d")
+        target = start or end
+        result = kpi.diagnose_congestion(port=port, target_date=target)
+        evidence = _retrieve_evidence(
+            retriever=retriever,
+            question=question,
+            entities=entities,
+            overrides=user_filters,
+            top_k=top_k_evidence,
+            include_dates=True,
+        )
+        return result, evidence
 
     if intent_result.intent == "F":
-        q = question.lower()
-        if any(token in q for token in ("jump", "spoof", "teleport", "impossible")) and retriever is not None:
-            filters = _make_rag_filters(entities)
+        if any(token in q_lower for token in ("jump", "spoof", "teleport", "impossible")) and retriever is not None:
+            filters = _make_rag_filters(entities=entities, overrides=user_filters, include_dates=True)
             jumps = retriever.detect_sudden_jumps(filters=filters)
             count = int(jumps.get("count", 0))
-            ids = jumps.get("rows", [])[:10]
             result = AnalyticsResult(
                 status="ok",
                 answer=f"Detected {count} potential sudden AIS coordinate jumps in the filtered range.",
-                table=pd.DataFrame({"row_id": ids}) if ids else pd.DataFrame(),
+                table=None,
                 chart=None,
-                coverage_notes=[
+                coverage_notes=[],
+                caveats=[
                     "Jump rule: coordinate displacement above threshold within 30 minutes.",
-                    f"Rows flagged: {count}",
+                    "This is a heuristic anomaly indicator, not proof of spoofing.",
                 ],
-                caveats=["This is a heuristic anomaly indicator, not proof of spoofing."],
             )
-            evidence = _retrieve_diagnostic_evidence(retriever, question, entities, top_k=top_k_evidence)
-            return result, evidence
+        else:
+            result = kpi.detect_arrival_spikes(port=port, start=start, end=end)
 
-        return (
-            kpi.detect_arrival_spikes(port=port, start=start, end=end),
-            _retrieve_diagnostic_evidence(retriever, question, entities, top_k=top_k_evidence),
+        evidence = _retrieve_evidence(
+            retriever=retriever,
+            question=question,
+            entities=entities,
+            overrides=user_filters,
+            top_k=top_k_evidence,
+            include_dates=True,
         )
+        return result, evidence
 
-    # Safe fallback.
-    return (
-        kpi.get_arrivals(port=port, start=start, end=end, vessel_type=vessel_type, dow=dow, window=window),
-        [],
-    )
-
-
-def _render_ask_tab(
-    kpi: KPIQueryEngine,
-    forecaster: ForecastEngine,
-    retriever: Optional[RAGRetriever],
-    top_k_evidence: int,
-) -> None:
-    st.subheader("Ask")
-    question = st.text_area(
-        "Question",
-        value="What will congestion look like next Friday at LUBECK?",
-        height=90,
-    )
-
-    ask = st.button("Ask", type="primary")
-    if not ask:
-        return
-
-    intent_result = classify_question(question)
-    st.markdown(f"**Intent:** `{intent_result.intent}` ({describe_intent(intent_result.intent)})")
-    st.markdown(f"**Reason:** {intent_result.reason}")
-    st.markdown(f"**Required data:** `{', '.join(required_data_for_intent(intent_result.intent)) or 'none'}`")
-    with st.expander("Extracted entities"):
-        st.json(intent_result.entities)
-
-    result, evidence = _handle_ask_question(
-        question=question,
-        intent_result=intent_result,
-        kpi=kpi,
-        forecaster=forecaster,
+    result = kpi.get_arrivals(port=port, start=start, end=end, vessel_type=vessel_type, dow=dow, window=window)
+    evidence = _retrieve_evidence(
         retriever=retriever,
-        top_k_evidence=top_k_evidence,
+        question=question,
+        entities=entities,
+        overrides=user_filters,
+        top_k=top_k_evidence,
+        include_dates=True,
     )
+    return result, evidence
 
-    if isinstance(result, ForecastResult):
-        _render_forecast_result(result)
-    else:
-        _render_analytics_result(result)
 
-    if evidence:
-        st.subheader("Representative Evidence")
-        for line in evidence:
+def _render_compact_result(
+    result: Union[AnalyticsResult, ForecastResult],
+    evidence: EvidenceBundle,
+) -> None:
+    def _fallback_evidence_from_result(
+        value: Union[AnalyticsResult, ForecastResult],
+        max_items: int = 5,
+    ) -> List[str]:
+        lines: List[str] = []
+
+        if isinstance(value, ForecastResult):
+            if value.history is not None and not value.history.empty:
+                hist = value.history.copy()
+                if "date" in hist.columns and "actual" in hist.columns:
+                    hist["date"] = pd.to_datetime(hist["date"], errors="coerce", utc=True).dt.floor("D")
+                    hist = hist.dropna(subset=["date", "actual"]).sort_values("date")
+                    for _, row in hist.tail(max_items).iterrows():
+                        lines.append(
+                            f"Historical point | {row['date'].strftime('%Y-%m-%d')} | value={float(row['actual']):.2f}"
+                        )
+
+            if value.forecast is not None and not value.forecast.empty:
+                fdf = value.forecast.copy()
+                if "date" in fdf.columns and "predicted" in fdf.columns:
+                    fdf["date"] = pd.to_datetime(fdf["date"], errors="coerce", utc=True).dt.floor("D")
+                    fdf = fdf.dropna(subset=["date", "predicted"]).sort_values("date")
+                    for _, row in fdf.tail(min(2, max_items)).iterrows():
+                        lower = float(row["lower"]) if "lower" in row and pd.notna(row["lower"]) else float("nan")
+                        upper = float(row["upper"]) if "upper" in row and pd.notna(row["upper"]) else float("nan")
+                        lines.append(
+                            f"Forecast target | {row['date'].strftime('%Y-%m-%d')} | "
+                            f"pred={float(row['predicted']):.2f}, range={lower:.2f}-{upper:.2f}"
+                        )
+            return lines[:max_items]
+
+        if value.table is not None and not value.table.empty:
+            tdf = value.table.head(max_items).copy()
+            for _, row in tdf.iterrows():
+                fragments: List[str] = []
+                for col in tdf.columns[:4]:
+                    cell = row[col]
+                    if pd.isna(cell):
+                        continue
+                    if isinstance(cell, pd.Timestamp):
+                        rendered = cell.strftime("%Y-%m-%d")
+                    else:
+                        rendered = str(cell)
+                    fragments.append(f"{col}={rendered}")
+                if fragments:
+                    lines.append(" | ".join(fragments))
+        return lines[:max_items]
+
+    def _extract_confidence_label(value: Union[AnalyticsResult, ForecastResult]) -> str:
+        if value.status != "ok":
+            return "low (insufficient matched data/evidence)"
+        for note in value.caveats:
+            if note.lower().startswith("confidence:"):
+                return note.split(":", 1)[1].strip()
+        if isinstance(value, ForecastResult):
+            return "medium (forecast based on available historical patterns)"
+        return "medium (deterministic aggregation over filtered rows)"
+
+    def _build_method_steps(value: Union[AnalyticsResult, ForecastResult]) -> List[str]:
+        steps: List[str] = []
+        if isinstance(value, ForecastResult):
+            steps.append("Applied active filters (port/date/vessel-type) to the congestion history for this query.")
+            for note in value.coverage_notes:
+                if note.startswith("Coverage window:") or note.startswith("Rows used:") or note.startswith("Target date:"):
+                    steps.append(note)
+            method = next((n for n in value.coverage_notes if n.startswith("Method:")), None)
+            if method:
+                steps.append(method)
+            steps.append("Computed point estimate and uncertainty interval (lower-upper) for the requested target.")
+        else:
+            steps.append("Applied active filters (port/date/vessel-type/anomaly) to KPI tables.")
+            for note in value.coverage_notes:
+                if note.startswith("Coverage window:") or note.startswith("Rows used:") or note.startswith("Data sources used:"):
+                    steps.append(note)
+            if value.table is not None and not value.table.empty:
+                steps.append(f"Aggregated filtered rows into {len(value.table):,} output row(s) using deterministic pandas operations.")
+            else:
+                steps.append("Computed deterministic metric directly from the filtered subset.")
+
+        assumptions = [c for c in value.caveats if not c.lower().startswith("confidence:")]
+        for assumption in assumptions[:2]:
+            steps.append(f"Assumption: {assumption}")
+
+        deduped: List[str] = []
+        for step in steps:
+            if step and step not in deduped:
+                deduped.append(step)
+        return deduped
+
+    def _to_naive_datetime(series: pd.Series) -> pd.Series:
+        parsed = pd.to_datetime(series, errors="coerce", utc=True)
+        return parsed.dt.tz_convert(None)
+
+    def _render_chart(value: Union[AnalyticsResult, ForecastResult]) -> None:
+        st.subheader("Chart")
+
+        if isinstance(value, ForecastResult):
+            hist = pd.DataFrame()
+            if value.history is not None and not value.history.empty and {"date", "actual"}.issubset(value.history.columns):
+                hist = value.history[["date", "actual"]].copy()
+                hist["date"] = _to_naive_datetime(hist["date"]).dt.floor("D")
+                hist = hist.dropna(subset=["date"]).sort_values("date")
+
+            fc = pd.DataFrame()
+            if value.forecast is not None and not value.forecast.empty and {"date", "predicted"}.issubset(value.forecast.columns):
+                cols = [c for c in ("date", "predicted", "lower", "upper") if c in value.forecast.columns]
+                fc = value.forecast[cols].copy()
+                fc["date"] = _to_naive_datetime(fc["date"]).dt.floor("D")
+                fc = fc.dropna(subset=["date"]).sort_values("date")
+
+            if hist.empty and fc.empty:
+                st.info("No chartable series for this response.")
+                return
+
+            gap_days = 0
+            if not hist.empty and not fc.empty:
+                gap_days = int((fc["date"].min() - hist["date"].max()).days)
+
+            if gap_days > 60:
+                st.caption("Recent historical series used for baseline.")
+                hist_tail = hist.tail(90).copy()
+                if alt is not None and not hist_tail.empty:
+                    c1 = (
+                        alt.Chart(hist_tail)
+                        .mark_line(color="#60a5fa", point=True)
+                        .encode(
+                            x=alt.X("date:T", title="Date"),
+                            y=alt.Y("actual:Q", title="Observed value"),
+                            tooltip=["date:T", alt.Tooltip("actual:Q", format=".2f")],
+                        )
+                        .properties(height=260)
+                    )
+                    st.altair_chart(c1, use_container_width=True)
+                elif not hist_tail.empty:
+                    st.line_chart(hist_tail.set_index("date")[["actual"]], use_container_width=True)
+
+                if not fc.empty:
+                    st.caption("Prediction interval for requested target date.")
+                    fc_tail = fc.tail(1).copy()
+                    if alt is not None:
+                        band = (
+                            alt.Chart(fc_tail)
+                            .mark_rule(color="#f59e0b", strokeWidth=4)
+                            .encode(
+                                x=alt.X("date:T", title="Target date"),
+                                y=alt.Y("lower:Q", title="Forecast"),
+                                y2="upper:Q",
+                                tooltip=[
+                                    "date:T",
+                                    alt.Tooltip("predicted:Q", format=".2f"),
+                                    alt.Tooltip("lower:Q", format=".2f"),
+                                    alt.Tooltip("upper:Q", format=".2f"),
+                                ],
+                            )
+                        )
+                        point = alt.Chart(fc_tail).mark_point(color="#ef4444", size=120, filled=True).encode(
+                            x="date:T",
+                            y="predicted:Q",
+                        )
+                        st.altair_chart((band + point).properties(height=220), use_container_width=True)
+                    else:
+                        st.dataframe(fc_tail, use_container_width=True, hide_index=True)
+                return
+
+            hist_tail = hist.tail(120).copy()
+            frames: List[pd.DataFrame] = []
+            if not hist_tail.empty:
+                frames.append(hist_tail.assign(series="actual", value=hist_tail["actual"])[["date", "series", "value"]])
+            if not fc.empty:
+                frames.append(fc.assign(series="predicted", value=fc["predicted"])[["date", "series", "value"]])
+            long_df = pd.concat(frames, ignore_index=True) if frames else pd.DataFrame()
+
+            if alt is not None and not long_df.empty:
+                chart = (
+                    alt.Chart(long_df)
+                    .mark_line(point=True)
+                    .encode(
+                        x=alt.X("date:T", title="Date"),
+                        y=alt.Y("value:Q", title="Value"),
+                        color=alt.Color("series:N", scale=alt.Scale(range=["#60a5fa", "#f59e0b"])),
+                        tooltip=["date:T", "series:N", alt.Tooltip("value:Q", format=".2f")],
+                    )
+                    .properties(height=280)
+                )
+                if not fc.empty and {"lower", "upper"}.issubset(fc.columns):
+                    interval = (
+                        alt.Chart(fc)
+                        .mark_area(color="#f59e0b", opacity=0.15)
+                        .encode(x="date:T", y="lower:Q", y2="upper:Q")
+                    )
+                    chart = interval + chart
+                st.altair_chart(chart, use_container_width=True)
+            elif not long_df.empty:
+                wide = long_df.pivot_table(index="date", columns="series", values="value", aggfunc="mean").sort_index()
+                st.line_chart(wide, use_container_width=True)
+            return
+
+        if value.chart is None or value.chart.empty:
+            st.info("No chartable series for this response.")
+            return
+
+        chart_df = value.chart.copy()
+        if isinstance(chart_df.index, pd.DatetimeIndex):
+            plot_df = chart_df.reset_index().rename(columns={chart_df.index.name or "index": "x"})
+            plot_df["x"] = _to_naive_datetime(plot_df["x"]).dt.floor("D")
+            value_col = [c for c in plot_df.columns if c != "x"][0]
+            if alt is not None:
+                chart = (
+                    alt.Chart(plot_df.dropna(subset=["x"]))
+                    .mark_line(color="#60a5fa", point=True)
+                    .encode(
+                        x=alt.X("x:T", title="Date"),
+                        y=alt.Y(f"{value_col}:Q", title=value_col.replace("_", " ").title()),
+                        tooltip=["x:T", alt.Tooltip(f"{value_col}:Q", format=".2f")],
+                    )
+                    .properties(height=280)
+                )
+                st.altair_chart(chart, use_container_width=True)
+            else:
+                st.line_chart(chart_df, use_container_width=True)
+        else:
+            plot_df = chart_df.reset_index().rename(columns={chart_df.index.name or "index": "x"})
+            value_col = [c for c in plot_df.columns if c != "x"][0]
+            if alt is not None:
+                chart = (
+                    alt.Chart(plot_df)
+                    .mark_bar(color="#60a5fa")
+                    .encode(
+                        x=alt.X("x:N", title=plot_df.columns[0], sort="-y"),
+                        y=alt.Y(f"{value_col}:Q", title=value_col.replace("_", " ").title()),
+                        tooltip=[plot_df.columns[0], alt.Tooltip(f"{value_col}:Q", format=".2f")],
+                    )
+                    .properties(height=280)
+                )
+                st.altair_chart(chart, use_container_width=True)
+            else:
+                st.bar_chart(chart_df, use_container_width=True)
+
+    st.subheader("Answer")
+    st.write(result.answer)
+
+    st.subheader("Evidence")
+    retrieved_lines = evidence.lines
+    computed_lines = _fallback_evidence_from_result(result)
+
+    if retrieved_lines:
+        st.markdown("**Retrieved evidence**")
+        for line in retrieved_lines:
             st.markdown(f"- {line}")
+    if computed_lines:
+        st.markdown("**Computed evidence used for this answer**")
+        for line in computed_lines:
+            st.markdown(f"- {line}")
+    if not retrieved_lines and not computed_lines:
+        st.info("No evidence rows were available for this response.")
 
+    st.subheader("Confidence")
+    st.write(_extract_confidence_label(result))
 
-def _render_forecast_tab(forecaster: ForecastEngine) -> None:
-    st.subheader("Forecast")
+    _render_chart(result)
 
-    c1, c2, c3 = st.columns(3)
-    with c1:
-        port = st.text_input("Port / LOCODE / destination", value="LUBECK", key="fc_port")
-    with c2:
-        target_dow = st.selectbox("Target weekday", options=[
-            "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"
-        ], index=4)
-    with c3:
-        horizon_weeks = st.slider("Horizon weeks", min_value=1, max_value=12, value=4)
+    method_steps = _build_method_steps(result)
+    if method_steps:
+        st.subheader("How This Was Computed")
+        for idx, step in enumerate(method_steps, start=1):
+            st.markdown(f"{idx}. {step}")
 
-    metric = st.radio("Forecast metric", options=["Congestion index", "Arrivals"], horizontal=True)
-    run = st.button("Run forecast", type="primary", key="run_forecast")
-    if not run:
-        return
-
-    if metric == "Congestion index":
-        result = forecaster.forecast_congestion(port=port, target_dow=target_dow, horizon_weeks=horizon_weeks)
-    else:
-        result = forecaster.forecast_arrivals(port=port, horizon_weeks=horizon_weeks)
-
-    _render_forecast_result(result)
-
-
-def _render_evaluate_tab(model_dir: Path, processed_dir: Path, kpi: KPIQueryEngine) -> None:
-    st.subheader("Evaluate")
-
-    dest_metrics = _read_json(model_dir / "destination_metrics.json")
-    eta_metrics = _read_json(model_dir / "eta_metrics.json")
-    anomaly_metrics = _read_json(model_dir / "anomaly_metrics.json")
-
-    st.markdown("### Prediction Models")
-    if dest_metrics:
-        c1, c2, c3 = st.columns(3)
-        c1.metric("Destination Top-1", f"{dest_metrics.get('top1_accuracy', 0):.3f}")
-        c2.metric("Destination Top-5", f"{dest_metrics.get('top5_accuracy', 0):.3f}")
-        c3.metric("Destination Classes", str(dest_metrics.get("num_classes", "n/a")))
-    if eta_metrics and not eta_metrics.get("skipped"):
-        c1, c2, c3 = st.columns(3)
-        c1.metric("ETA MAE (min)", f"{eta_metrics.get('mae_minutes', 0):.1f}")
-        c2.metric("ETA RMSE (min)", f"{eta_metrics.get('rmse_minutes', 0):.1f}")
-        c3.metric("ETA MedAE (min)", f"{eta_metrics.get('median_absolute_error_minutes', 0):.1f}")
-    if anomaly_metrics and not anomaly_metrics.get("skipped"):
-        st.metric("Anomaly training rows", str(anomaly_metrics.get("rows", "n/a")))
-
-    st.markdown("### Forecast Backtest")
-    backtest_path = processed_dir / "forecast_backtest.json"
-    payload: Dict[str, Any] = _read_json(backtest_path)
-
-    run_bt = st.button("Run / Refresh Backtest")
-    if run_bt:
-        with st.spinner("Running forecast backtest..."):
-            payload = run_backtest(processed_dir=processed_dir, out_path=backtest_path)
-
-    if payload:
-        arrivals = payload.get("arrivals", {})
-        congestion = payload.get("congestion", {})
-        c1, c2 = st.columns(2)
-        with c1:
-            st.markdown("**Arrivals Backtest**")
-            if arrivals.get("skipped"):
-                st.info(arrivals.get("reason", "skipped"))
-            else:
-                st.write(f"Ports: {arrivals.get('ports_evaluated')}")
-                st.write(f"MAE: {arrivals.get('mae_mean', 0):.3f}")
-                st.write(f"MAPE: {arrivals.get('mape_mean', 0):.2f}%")
-                st.dataframe(pd.DataFrame(arrivals.get("per_port", [])))
-        with c2:
-            st.markdown("**Congestion Backtest**")
-            if congestion.get("skipped"):
-                st.info(congestion.get("reason", "skipped"))
-            else:
-                st.write(f"Ports: {congestion.get('ports_evaluated')}")
-                st.write(f"MAE: {congestion.get('mae_mean', 0):.3f}")
-                st.write(f"MAPE: {congestion.get('mape_mean', 0):.2f}%")
-                st.dataframe(pd.DataFrame(congestion.get("per_port", [])))
-    else:
-        st.info("No forecast backtest file found yet. Click 'Run / Refresh Backtest'.")
-
-    st.markdown("### KPI Capability Check")
-    st.json(kpi.capabilities())
+    if evidence.trace or evidence.rows:
+        with st.expander("Retrieval Trace", expanded=False):
+            if evidence.trace:
+                st.json(evidence.trace)
+            if evidence.rows:
+                trace_df = pd.DataFrame(evidence.rows)
+                cols = [c for c in ["vector_id", "chunk_id", "distance", "timestamp", "port", "vessel_type", "mmsi"] if c in trace_df.columns]
+                st.dataframe(trace_df[cols], use_container_width=True, hide_index=True)
 
 
 def main() -> None:
-    st.set_page_config(page_title="Portathon Congestion Analytics + Forecast", layout="wide")
-    st.title("Portathon Analytics + Forecast Demo")
-    st.caption("Deterministic KPI analytics + historical-pattern forecasting. RAG is optional evidence, not numeric truth.")
+    st.set_page_config(page_title="Portathon Ask", layout="wide")
+    st.title("Portathon Ask")
+    st.caption("Ask about traffic patterns, anomalies, and future congestion predictions.")
 
     config_path = "config/config.yaml"
     config = load_config(config_path)
-    predict_cfg = config.get("predict", {})
-
-    default_persist = config["paths"]["persist_dir"]
-    default_processed_dir = Path(predict_cfg.get("processed_dir", "data/processed"))
-    default_model_dir = Path(predict_cfg.get("model_dir", "models"))
+    default_processed_dir = Path(config.get("predict", {}).get("processed_dir", "data/processed"))
+    persist_dir = config["paths"].get("persist_dir", "data/chroma")
 
     with st.sidebar:
-        st.subheader("Runtime")
-        processed_dir = Path(st.text_input("Processed dir", value=str(default_processed_dir)))
-        persist_dir = st.text_input("Chroma persist dir", value=default_persist)
-        model_dir = Path(st.text_input("Model dir", value=str(default_model_dir)))
-        top_k_evidence = st.slider("Evidence top K", min_value=1, max_value=10, value=5)
+        st.subheader("Ask Settings")
+        top_k_evidence = st.slider("Evidence top K", min_value=1, max_value=8, value=5)
+        st.caption("Keep questions specific (port + date helps).")
 
-        st.markdown(
-            "Build KPIs: `python -m src.kpi.build_kpis ...`\n\n"
-            "Run backtest: `python -m src.forecast.backtest`"
-        )
-
-    kpi_engine: Optional[KPIQueryEngine] = None
-    forecast_engine: Optional[ForecastEngine] = None
     try:
-        kpi_engine = _init_kpi_engine(str(processed_dir))
-        forecast_engine = _init_forecast_engine(str(processed_dir))
+        kpi_engine = _init_kpi_engine(str(default_processed_dir))
+        forecast_engine = _init_forecast_engine(str(default_processed_dir))
     except Exception as exc:
-        st.error(f"Could not initialize KPI/Forecast engines: {exc}")
+        st.error(f"Could not initialize data engines: {exc}")
+        st.info("Run `./run_demo_pipeline.sh` first.")
+        st.stop()
 
     retriever: Optional[RAGRetriever] = None
     if os.getenv("OPENAI_API_KEY"):
         try:
             retriever = _init_retriever(persist_dir=persist_dir, config_path=config_path)
-        except Exception as exc:
-            st.warning(f"RAG evidence disabled: {exc}")
+        except Exception:
+            retriever = None
 
-    _render_diagnostics(
-        config=config,
-        persist_dir=persist_dir,
-        processed_dir=processed_dir,
-        model_dir=model_dir,
-        kpi_engine=kpi_engine,
+    st.subheader("Sample Queries")
+    if "ask_question" not in st.session_state:
+        st.session_state["ask_question"] = SAMPLE_QUERIES[0]
+
+    selected = st.selectbox("Try a sample query", options=SAMPLE_QUERIES, index=0)
+    if st.button("Load sample query"):
+        st.session_state["ask_question"] = selected
+
+    st.subheader("Ask")
+    st.text_area("Question", key="ask_question", height=90)
+
+    with st.expander("Optional filters", expanded=False):
+        ui_port = st.text_input("Port / LOCODE", value="")
+        ui_date_from = st.text_input("From date (YYYY-MM-DD)", value="")
+        ui_date_to = st.text_input("To date (YYYY-MM-DD)", value="")
+        ui_vessel_type = st.text_input("Vessel type", value="")
+        ui_anomaly = st.selectbox("Anomaly flag", options=["any", "true", "false"], index=0)
+
+    ask = st.button("Ask", type="primary")
+    if not ask:
+        return
+
+    question = st.session_state.get("ask_question", "").strip()
+    if not question:
+        st.warning("Enter a question first.")
+        return
+
+    intent_result = classify_question(question)
+
+    user_filters: Dict[str, Any] = {
+        "port": ui_port or None,
+        "date_from": ui_date_from or None,
+        "date_to": ui_date_to or None,
+        "vessel_type": ui_vessel_type or None,
+        "anomaly": _parse_anomaly_filter(ui_anomaly),
+    }
+
+    result, evidence = _handle_ask_question(
+        question=question,
+        intent_result=intent_result,
+        kpi=kpi_engine,
+        forecaster=forecast_engine,
+        retriever=retriever,
+        top_k_evidence=top_k_evidence,
+        user_filters=user_filters,
     )
 
-    if kpi_engine is None or forecast_engine is None:
-        st.stop()
-
-    tab_ask, tab_forecast, tab_eval = st.tabs(["Ask", "Forecast", "Evaluate"])
-
-    with tab_ask:
-        _render_ask_tab(
-            kpi=kpi_engine,
-            forecaster=forecast_engine,
-            retriever=retriever,
-            top_k_evidence=top_k_evidence,
-        )
-
-    with tab_forecast:
-        _render_forecast_tab(forecaster=forecast_engine)
-
-    with tab_eval:
-        _render_evaluate_tab(model_dir=model_dir, processed_dir=processed_dir, kpi=kpi_engine)
+    _render_compact_result(result=result, evidence=evidence)
 
 
 if __name__ == "__main__":
