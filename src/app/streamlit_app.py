@@ -839,9 +839,9 @@ def _render_compact_result(
 
 
 def main() -> None:
-    st.set_page_config(page_title="Portathon Ask", layout="wide")
-    st.title("Portathon Ask")
-    st.caption("Ask about traffic patterns, anomalies, and future congestion predictions.")
+    st.set_page_config(page_title="Eagle Eye", layout="wide")
+    st.title("Eagle Eye")
+    st.caption("Eagle Eye for traffic patterns, anomalies, and future congestion predictions.")
 
     config_path = "config/config.yaml"
     config = load_config(config_path)

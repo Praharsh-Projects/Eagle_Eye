@@ -48,7 +48,7 @@ def ingest_web_urls(
     ids: List[str] = []
     texts: List[str] = []
     metadatas: List[Dict[str, Any]] = []
-    headers = {"User-Agent": "Portathon-RAG-Demo/1.0"}
+    headers = {"User-Agent": "EagleEye-RAG-Demo/1.0"}
 
     for url in urls:
         url = url.strip()
