@@ -114,6 +114,10 @@ Use these exact values in Streamlit Cloud:
 - Main file path: `app/streamlit_app.py`
 
 For cloud environments where `data/processed` is not present, the app auto-falls back to bundled demo data in `demo_data/processed`.
+For cloud environments where `data/chroma` is not present, the app auto-falls back to bundled demo vector index in `demo_data/chroma`.
+
+To enable vector retrieval evidence (`vector_id`, `chunk_id`, distance), set Streamlit secret:
+- `OPENAI_API_KEY = "..."`.
 
 ## 6) Congestion Definition (used in code)
 

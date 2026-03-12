@@ -12,6 +12,8 @@ data/*
 
 # Chroma persistence
 chroma/
+!demo_data/chroma/
+!demo_data/chroma/**
 
 # Streamlit
 .streamlit/

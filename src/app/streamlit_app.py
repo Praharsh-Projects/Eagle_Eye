@@ -70,6 +70,16 @@ def _resolve_processed_dir(preferred_dir: Path) -> tuple[Path, bool]:
     return preferred_dir, False
 
 
+def _resolve_persist_dir(preferred_dir: Path) -> tuple[Path, bool]:
+    required = preferred_dir / "chroma.sqlite3"
+    if required.exists():
+        return preferred_dir, False
+    fallback = Path("demo_data/chroma")
+    if (fallback / "chroma.sqlite3").exists():
+        return fallback, True
+    return preferred_dir, False
+
+
 def _parse_anomaly_filter(value: str) -> Optional[bool]:
     lowered = value.strip().lower()
     if lowered == "true":
@@ -857,7 +867,8 @@ def main() -> None:
     config = load_config(config_path)
     configured_processed_dir = Path(config.get("predict", {}).get("processed_dir", "data/processed"))
     default_processed_dir, using_demo_processed = _resolve_processed_dir(configured_processed_dir)
-    persist_dir = config["paths"].get("persist_dir", "data/chroma")
+    configured_persist_dir = Path(config["paths"].get("persist_dir", "data/chroma"))
+    persist_dir, using_demo_chroma = _resolve_persist_dir(configured_persist_dir)
 
     with st.sidebar:
         st.subheader("Ask Settings")
@@ -865,6 +876,8 @@ def main() -> None:
         st.caption("Keep questions specific (port + date helps).")
         if using_demo_processed:
             st.info("Running with bundled demo processed data (`demo_data/processed`).")
+        if using_demo_chroma:
+            st.info("Running with bundled demo vector index (`demo_data/chroma`).")
 
     try:
         kpi_engine = _init_kpi_engine(str(default_processed_dir))
@@ -877,9 +890,12 @@ def main() -> None:
     retriever: Optional[RAGRetriever] = None
     if os.getenv("OPENAI_API_KEY"):
         try:
-            retriever = _init_retriever(persist_dir=persist_dir, config_path=config_path)
+            retriever = _init_retriever(persist_dir=str(persist_dir), config_path=config_path)
         except Exception:
             retriever = None
+    else:
+        with st.sidebar:
+            st.warning("Set `OPENAI_API_KEY` in app secrets to enable vector retrieval evidence.")
 
     st.subheader("Sample Queries")
     if "ask_question" not in st.session_state:
