@@ -1,0 +1,10 @@
+{
+  "has_port_calls": false,
+  "has_ais_destination_proxy": true,
+  "has_dwell_time": false,
+  "has_occupancy_hourly": false,
+  "date_min": "2021-01-01",
+  "date_max": "2022-04-30",
+  "ports": 6,
+  "mode": "demo_subset"
+}

@@ -106,6 +106,15 @@ Tabs:
 - **Forecast**: explicit port/day/horizon forecast controls
 - **Evaluate**: model metrics + forecast backtest
 
+## 5.1) Streamlit Cloud Deploy
+
+Use these exact values in Streamlit Cloud:
+- Repository: `Praharsh-Projects/Eagle_Eye`
+- Branch: `main`
+- Main file path: `app/streamlit_app.py`
+
+For cloud environments where `data/processed` is not present, the app auto-falls back to bundled demo data in `demo_data/processed`.
+
 ## 6) Congestion Definition (used in code)
 
 Daily congestion proxy per port:

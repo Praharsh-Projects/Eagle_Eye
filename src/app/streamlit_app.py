@@ -60,6 +60,16 @@ def _init_retriever(persist_dir: str, config_path: str) -> RAGRetriever:
     return RAGRetriever(persist_dir=persist_dir, config_path=config_path)
 
 
+def _resolve_processed_dir(preferred_dir: Path) -> tuple[Path, bool]:
+    required = preferred_dir / "arrivals_daily.parquet"
+    if required.exists():
+        return preferred_dir, False
+    fallback = Path("demo_data/processed")
+    if (fallback / "arrivals_daily.parquet").exists():
+        return fallback, True
+    return preferred_dir, False
+
+
 def _parse_anomaly_filter(value: str) -> Optional[bool]:
     lowered = value.strip().lower()
     if lowered == "true":
@@ -845,13 +855,16 @@ def main() -> None:
 
     config_path = "config/config.yaml"
     config = load_config(config_path)
-    default_processed_dir = Path(config.get("predict", {}).get("processed_dir", "data/processed"))
+    configured_processed_dir = Path(config.get("predict", {}).get("processed_dir", "data/processed"))
+    default_processed_dir, using_demo_processed = _resolve_processed_dir(configured_processed_dir)
     persist_dir = config["paths"].get("persist_dir", "data/chroma")
 
     with st.sidebar:
         st.subheader("Ask Settings")
         top_k_evidence = st.slider("Evidence top K", min_value=1, max_value=8, value=5)
         st.caption("Keep questions specific (port + date helps).")
+        if using_demo_processed:
+            st.info("Running with bundled demo processed data (`demo_data/processed`).")
 
     try:
         kpi_engine = _init_kpi_engine(str(default_processed_dir))
