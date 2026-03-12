@@ -89,6 +89,22 @@ def _parse_anomaly_filter(value: str) -> Optional[bool]:
     return None
 
 
+def _load_openai_api_key_from_runtime() -> tuple[Optional[str], str]:
+    key = (os.getenv("OPENAI_API_KEY") or "").strip()
+    if key:
+        return key, "env"
+
+    try:
+        secret_key = str(st.secrets.get("OPENAI_API_KEY", "")).strip()
+    except Exception:
+        secret_key = ""
+
+    if secret_key:
+        os.environ["OPENAI_API_KEY"] = secret_key
+        return secret_key, "streamlit_secrets"
+    return None, "missing"
+
+
 def _pick_filter(override: Optional[str], extracted: Optional[str]) -> Optional[str]:
     if override is not None and override.strip():
         return override.strip()
@@ -137,12 +153,14 @@ def _retrieve_evidence(
     top_k: int,
     include_dates: bool,
 ) -> EvidenceBundle:
+    runtime_reason = str(st.session_state.get("retriever_reason", "")).strip()
     empty = EvidenceBundle(
         lines=[],
         rows=[],
         trace={
             "retrieval_status": "disabled",
-            "reason": "Retriever unavailable (missing OPENAI_API_KEY or retriever init failure).",
+            "reason": runtime_reason
+            or "Retriever unavailable (missing OPENAI_API_KEY or retriever init failure).",
         },
     )
     if retriever is None:
@@ -888,14 +906,21 @@ def main() -> None:
         st.stop()
 
     retriever: Optional[RAGRetriever] = None
-    if os.getenv("OPENAI_API_KEY"):
+    retriever_reason = ""
+    api_key, key_source = _load_openai_api_key_from_runtime()
+    if api_key:
         try:
             retriever = _init_retriever(persist_dir=str(persist_dir), config_path=config_path)
-        except Exception:
+            retriever_reason = f"Retriever active (API key source: {key_source})."
+        except Exception as exc:
             retriever = None
+            retriever_reason = f"Retriever init failed: {exc}"
     else:
+        retriever_reason = "Retriever unavailable: `OPENAI_API_KEY` not found in environment or Streamlit secrets."
         with st.sidebar:
             st.warning("Set `OPENAI_API_KEY` in app secrets to enable vector retrieval evidence.")
+
+    st.session_state["retriever_reason"] = retriever_reason
 
     st.subheader("Sample Queries")
     if "ask_question" not in st.session_state:
