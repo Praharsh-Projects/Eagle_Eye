@@ -112,7 +112,7 @@ Use these exact values in Streamlit Cloud:
 - Branch: `main`
 - Main file path: `app/streamlit_app.py`
 
-For cloud environments where `data/processed` is not present, the app auto-falls back to bundled demo data in `demo_data/processed`.
+For cloud environments where `data/processed` is not present, the app auto-falls back to bundled app runtime KPI data in `demo_data/processed`.
 For cloud environments where `data/chroma` is not present, the app auto-falls back to bundled demo vector index in `demo_data/chroma`.
 
 To enable vector retrieval evidence (`vector_id`, `chunk_id`, distance), set Streamlit secret:
@@ -125,6 +125,16 @@ To run full-scale retrieval on cloud (same behavior as local), connect a remote 
 - `CHROMA_SSL = "true"` (for HTTPS services)
 - Optional: `CHROMA_TENANT`, `CHROMA_DATABASE`, `CHROMA_AUTH_TOKEN`, `CHROMA_AUTH_HEADER`
 
+To bootstrap full processed runtime data on cloud from a hosted bundle, set:
+- `APP_PROCESSED_BUNDLE_URL = "https://.../eagle_eye_processed_bundle.tar.gz"`
+
+Create that bundle locally:
+```bash
+python -m src.utils.package_cloud_bundle \
+  --processed_dir data/processed \
+  --out dist/eagle_eye_processed_bundle.tar.gz
+```
+
 Index directly to remote service:
 ```bash
 export VECTOR_DB_MODE=remote
@@ -136,6 +146,10 @@ python -m src.index.build_index \
   --traffic_csvs data/PRJ896.csv \
   --persist_dir data/chroma
 ```
+
+Cloud parity summary:
+- Deterministic analytics/forecast parity: bundled in `demo_data/processed`, or bootstrap via `APP_PROCESSED_BUNDLE_URL`
+- Retrieval parity: requires remote Chroma service because local `data/chroma` is too large for Streamlit Cloud
 
 ## 6) Congestion Definition (used in code)
 
@@ -170,4 +184,5 @@ Out of scope (clean refusal):
 - If Chroma fails with Python 3.14, recreate `.venv` with Python 3.12.
 - If RAG evidence is unavailable, ensure `OPENAI_API_KEY` is exported in the same terminal.
 - If retrieval is disabled on cloud, check Streamlit secrets for `OPENAI_API_KEY` and `CHROMA_*` variables.
+- If cloud is still on partial coverage, verify whether the sidebar shows `demo_data/processed`; if so, either upload the processed bundle or set `APP_PROCESSED_BUNDLE_URL`.
 - If Ask has no deterministic output, run `python -m src.kpi.build_kpis ...` first.

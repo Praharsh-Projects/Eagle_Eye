@@ -1,0 +1,266 @@
+{
+  "settings": {
+    "processed_dir": "data/processed",
+    "min_history_days": 60,
+    "test_days": 28,
+    "max_ports": 20
+  },
+  "arrivals": {
+    "metric": "arrivals_vessels",
+    "skipped": false,
+    "ports_evaluated": 20,
+    "mae_mean": 2.175204081632653,
+    "mape_mean": 47.76098752635288,
+    "per_port": [
+      {
+        "port_key": "FITOK",
+        "mae": 0.9755102040816327,
+        "mape": 53.16836734693876,
+        "test_points": 28
+      },
+      {
+        "port_key": "FIHKO",
+        "mae": 1.2801020408163262,
+        "mape": 35.80357142857143,
+        "test_points": 28
+      },
+      {
+        "port_key": "FIRAU",
+        "mae": 1.283163265306122,
+        "mape": 69.96513605442175,
+        "test_points": 28
+      },
+      {
+        "port_key": "SEBRO",
+        "mae": 1.3244897959183672,
+        "mape": 50.01542759961127,
+        "test_points": 28
+      },
+      {
+        "port_key": "SENRK",
+        "mae": 1.3352040816326531,
+        "mape": 69.0952380952381,
+        "test_points": 28
+      },
+      {
+        "port_key": "SEHEL",
+        "mae": 1.4147959183673469,
+        "mape": 58.052113702623906,
+        "test_points": 28
+      },
+      {
+        "port_key": "EETLL",
+        "mae": 1.580612244897959,
+        "mape": 37.16417638483965,
+        "test_points": 28
+      },
+      {
+        "port_key": "EEMUG",
+        "mae": 1.6107142857142855,
+        "mape": 55.70511418853255,
+        "test_points": 28
+      },
+      {
+        "port_key": "RULED",
+        "mae": 1.8545918367346936,
+        "mape": 72.2918488824101,
+        "test_points": 28
+      },
+      {
+        "port_key": "LVLPX",
+        "mae": 1.9418367346938774,
+        "mape": 43.85114998380305,
+        "test_points": 28
+      },
+      {
+        "port_key": "FIHEL",
+        "mae": 1.9642857142857142,
+        "mape": 74.74848153547133,
+        "test_points": 28
+      },
+      {
+        "port_key": "FIKTK",
+        "mae": 2.219387755102041,
+        "mape": 49.24098860323349,
+        "test_points": 28
+      },
+      {
+        "port_key": "LVRIX",
+        "mae": 2.6147959183673466,
+        "mape": 38.752033822186874,
+        "test_points": 28
+      },
+      {
+        "port_key": "LTKLJ",
+        "mae": 2.6683673469387754,
+        "mape": 21.572734317669788,
+        "test_points": 28
+      },
+      {
+        "port_key": "SESOE",
+        "mae": 2.6775510204081634,
+        "mape": 62.85793245869776,
+        "test_points": 28
+      },
+      {
+        "port_key": "SEGOT",
+        "mae": 2.717857142857144,
+        "mape": 17.684846915789294,
+        "test_points": 28
+      },
+      {
+        "port_key": "PLGDY",
+        "mae": 2.963775510204081,
+        "mape": 31.208413043872223,
+        "test_points": 28
+      },
+      {
+        "port_key": "PLSZZ",
+        "mae": 3.0056122448979585,
+        "mape": 36.77534733660539,
+        "test_points": 28
+      },
+      {
+        "port_key": "PLGDN",
+        "mae": 3.4438775510204076,
+        "mape": 38.15296579837395,
+        "test_points": 28
+      },
+      {
+        "port_key": "PLSWI",
+        "mae": 4.627551020408164,
+        "mape": 39.1138630281669,
+        "test_points": 28
+      }
+    ]
+  },
+  "congestion": {
+    "metric": "congestion_index",
+    "skipped": false,
+    "ports_evaluated": 20,
+    "mae_mean": 9.79522327670009,
+    "mape_mean": 519.352072412074,
+    "per_port": [
+      {
+        "port_key": "SEGUS",
+        "mae": 0.6077300485411555,
+        "mape": 43.945616346258674,
+        "test_points": 28
+      },
+      {
+        "port_key": "PLSWI",
+        "mae": 0.6612954489391881,
+        "mape": 26.292064430220634,
+        "test_points": 28
+      },
+      {
+        "port_key": "PLSZZ",
+        "mae": 0.7391659638531113,
+        "mape": 30.72337605579336,
+        "test_points": 28
+      },
+      {
+        "port_key": "LVLPX",
+        "mae": 0.8710153374760946,
+        "mape": 36.620252007522204,
+        "test_points": 28
+      },
+      {
+        "port_key": "FIHKO",
+        "mae": 0.9175963528079176,
+        "mape": 34.808033237087834,
+        "test_points": 28
+      },
+      {
+        "port_key": "LVRIX",
+        "mae": 0.9260283961694759,
+        "mape": 35.598996343484174,
+        "test_points": 28
+      },
+      {
+        "port_key": "EEMUG",
+        "mae": 0.95499717209111,
+        "mape": 43.27758396614775,
+        "test_points": 28
+      },
+      {
+        "port_key": "FIOUL",
+        "mae": 1.0548659866397585,
+        "mape": 49.67873979964466,
+        "test_points": 28
+      },
+      {
+        "port_key": "SENRK",
+        "mae": 1.1735909241885296,
+        "mape": 61.83174548220205,
+        "test_points": 28
+      },
+      {
+        "port_key": "SEMMA",
+        "mae": 1.2035930063762674,
+        "mape": 63.494996837565964,
+        "test_points": 28
+      },
+      {
+        "port_key": "SEVAG",
+        "mae": 1.4080182584633296,
+        "mape": 50.266810131045844,
+        "test_points": 28
+      },
+      {
+        "port_key": "SEKAN",
+        "mae": 1.4760685124896622,
+        "mape": 65.30851072354818,
+        "test_points": 28
+      },
+      {
+        "port_key": "LVVNT",
+        "mae": 1.5143931010171763,
+        "mape": 66.11890162507395,
+        "test_points": 28
+      },
+      {
+        "port_key": "SESOE",
+        "mae": 1.583532502622114,
+        "mape": 59.73718645585969,
+        "test_points": 28
+      },
+      {
+        "port_key": "EETLL",
+        "mae": 1.652543359041935,
+        "mape": 64.53095868405183,
+        "test_points": 28
+      },
+      {
+        "port_key": "FIRAU",
+        "mae": 1.8059784567387778,
+        "mape": 69.20883994960984,
+        "test_points": 28
+      },
+      {
+        "port_key": "SESTO",
+        "mae": 4.183697280847456,
+        "mape": 154.9426208758113,
+        "test_points": 28
+      },
+      {
+        "port_key": "SEUTA",
+        "mae": 15.595236910095048,
+        "mape": 1398.4840583347648,
+        "test_points": 28
+      },
+      {
+        "port_key": "SEDOM",
+        "mae": 19.307997015841035,
+        "mape": 895.7148993498012,
+        "test_points": 28
+      },
+      {
+        "port_key": "SENOL",
+        "mae": 138.26712149976268,
+        "mape": 7136.457257605985,
+        "test_points": 28
+      }
+    ]
+  }
+}

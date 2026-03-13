@@ -20,6 +20,7 @@ from src.forecast.forecast import ForecastEngine, ForecastResult
 from src.kpi.query import AnalyticsResult, KPIQueryEngine
 from src.qa.intent import IntentResult, classify_question
 from src.rag.retriever import QueryFilters, RAGRetriever
+from src.utils.cloud_bootstrap import ensure_bundle
 from src.utils.config import load_config
 from src.utils.runtime import chroma_remote_settings
 from src.utils.serialization import compact_traffic_evidence
@@ -111,6 +112,47 @@ def _load_openai_api_key_from_runtime() -> tuple[Optional[str], str]:
         os.environ["OPENAI_API_KEY"] = secret_key
         return secret_key, "streamlit_secrets"
     return None, "missing"
+
+
+def _load_runtime_setting(name: str) -> tuple[str, str]:
+    value = str(os.getenv(name, "")).strip()
+    if value:
+        return value, "env"
+    try:
+        secret_value = str(st.secrets.get(name, "")).strip()
+    except Exception:
+        secret_value = ""
+    if secret_value:
+        os.environ[name] = secret_value
+        return secret_value, "streamlit_secrets"
+    return "", "missing"
+
+
+def _maybe_bootstrap_processed_bundle(preferred_dir: Path) -> tuple[bool, str]:
+    required_files = [
+        "arrivals_daily.parquet",
+        "arrivals_hourly.parquet",
+        "congestion_daily.parquet",
+        "dwell_time.parquet",
+        "occupancy_hourly.parquet",
+        "port_catalog.parquet",
+        "kpi_capabilities.json",
+    ]
+    if all((preferred_dir / name).exists() for name in required_files):
+        return False, f"Processed runtime assets already exist in {preferred_dir}."
+
+    bundle_url, source = _load_runtime_setting("APP_PROCESSED_BUNDLE_URL")
+    if not bundle_url:
+        return False, "No APP_PROCESSED_BUNDLE_URL configured."
+
+    changed, message = ensure_bundle(
+        url=bundle_url,
+        target_dir=preferred_dir,
+        required_files=required_files,
+    )
+    if source != "missing":
+        message = f"{message} Source: {source}."
+    return changed, message
 
 
 def _pick_filter(override: Optional[str], extracted: Optional[str]) -> Optional[str]:
@@ -999,6 +1041,9 @@ def main() -> None:
     config_path = "config/config.yaml"
     config = load_config(config_path)
     configured_processed_dir = Path(config.get("predict", {}).get("processed_dir", "data/processed"))
+    processed_bootstrap_changed, processed_bootstrap_message = _maybe_bootstrap_processed_bundle(
+        configured_processed_dir
+    )
     default_processed_dir, using_demo_processed = _resolve_processed_dir(configured_processed_dir)
     configured_persist_dir = Path(config["paths"].get("persist_dir", "data/chroma"))
     requested_vector_mode = str(
@@ -1017,12 +1062,21 @@ def main() -> None:
         st.caption("Keep questions specific (port + date helps).")
         if using_demo_processed:
             st.info("Running with bundled demo processed data (`demo_data/processed`).")
+            if "APP_PROCESSED_BUNDLE_URL" in processed_bootstrap_message or "Downloaded" in processed_bootstrap_message:
+                st.warning(processed_bootstrap_message)
+        elif processed_bootstrap_changed:
+            st.info(processed_bootstrap_message)
+        elif "No APP_PROCESSED_BUNDLE_URL configured." not in processed_bootstrap_message:
+            st.warning(processed_bootstrap_message)
         if using_remote_vector:
             st.info("Using remote Chroma service (configured via CHROMA_* / VECTOR_DB_MODE).")
         if using_demo_chroma:
             st.info("Running with bundled demo vector index (`demo_data/chroma`).")
+            st.caption("Full retrieval parity with local requires a remote Chroma service because the full local vector store is too large for cloud packaging.")
         if requested_vector_mode in {"remote", "http"} and not using_remote_vector:
             st.warning("VECTOR_DB_MODE is remote but CHROMA_HOST is missing/invalid; using local/demo index.")
+        if not using_demo_processed and not processed_bootstrap_changed:
+            st.caption(f"Processed runtime path: {default_processed_dir}")
 
     try:
         kpi_engine = _init_kpi_engine(str(default_processed_dir))

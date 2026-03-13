@@ -1,9 +1,9 @@
 {
-  "has_port_calls": false,
+  "has_port_calls": true,
   "has_ais_destination_proxy": true,
-  "has_dwell_time": false,
-  "has_occupancy_hourly": false,
+  "has_dwell_time": true,
+  "has_occupancy_hourly": true,
   "date_min": "2021-01-01",
   "date_max": "2022-04-30",
-  "ports": 8358
+  "ports": 8375
 }
