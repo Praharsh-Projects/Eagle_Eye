@@ -16,7 +16,7 @@ from src.kpi.query import AnalyticsResult, KPIQueryEngine
 from src.qa.intent import IntentResult, classify_question
 from src.rag.retriever import QueryFilters, RAGRetriever
 from src.utils.ais_anomaly import detect_sudden_jump_events_from_parquet
-from src.utils.cloud_bootstrap import ensure_bundle
+from src.utils.cloud_bootstrap import ensure_bundle, ensure_file_manifest
 from src.utils.config import load_config
 from src.utils.runtime import chroma_remote_settings, force_local_vector_env
 from src.utils.serialization import compact_traffic_evidence
@@ -89,6 +89,32 @@ def _maybe_bootstrap_bundle(
         required_files=required_files,
     )
     return changed, message
+
+
+def _maybe_bootstrap_chroma_runtime(target_dir: Path) -> tuple[bool, str]:
+    required_files = ["chroma.sqlite3", "traffic_metadata_index.csv"]
+    if all((target_dir / name).exists() for name in required_files):
+        return False, f"Chroma runtime assets already exist in {target_dir}."
+
+    manifest_url = _load_runtime_setting("APP_CHROMA_MANIFEST_URL")
+    if manifest_url:
+        return ensure_file_manifest(
+            url=manifest_url,
+            target_dir=target_dir,
+            required_files=required_files,
+            timeout_seconds=3600,
+        )
+
+    bundle_url = _load_runtime_setting("APP_CHROMA_BUNDLE_URL")
+    if bundle_url:
+        return ensure_bundle(
+            url=bundle_url,
+            target_dir=target_dir,
+            required_files=required_files,
+            timeout_seconds=3600,
+        )
+
+    return False, "No APP_CHROMA_MANIFEST_URL or APP_CHROMA_BUNDLE_URL configured."
 
 
 def _init_retriever(
@@ -553,10 +579,8 @@ def _build_state() -> Dict[str, Any]:
     chroma_bootstrap_changed = False
     chroma_bootstrap_message = ""
     if not using_remote_vector:
-        chroma_bootstrap_changed, chroma_bootstrap_message = _maybe_bootstrap_bundle(
-            "APP_CHROMA_BUNDLE_URL",
-            configured_persist_dir,
-            ["chroma.sqlite3", "traffic_metadata_index.csv"],
+        chroma_bootstrap_changed, chroma_bootstrap_message = _maybe_bootstrap_chroma_runtime(
+            configured_persist_dir
         )
 
     processed_dir, using_demo_processed = _resolve_processed_dir(configured_processed_dir)
@@ -580,10 +604,8 @@ def _build_state() -> Dict[str, Any]:
         except Exception as exc:
             retriever_reason = f"Retriever init failed: {exc}"
             if using_remote_vector:
-                chroma_bootstrap_changed, chroma_bootstrap_message = _maybe_bootstrap_bundle(
-                    "APP_CHROMA_BUNDLE_URL",
-                    configured_persist_dir,
-                    ["chroma.sqlite3", "traffic_metadata_index.csv"],
+                chroma_bootstrap_changed, chroma_bootstrap_message = _maybe_bootstrap_chroma_runtime(
+                    configured_persist_dir
                 )
                 fallback_persist_dir, fallback_using_demo_chroma = _resolve_persist_dir(configured_persist_dir)
                 if (fallback_persist_dir / "chroma.sqlite3").exists():

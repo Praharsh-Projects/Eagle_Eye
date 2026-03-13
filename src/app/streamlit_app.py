@@ -21,7 +21,7 @@ from src.kpi.query import AnalyticsResult, KPIQueryEngine
 from src.qa.intent import IntentResult, classify_question
 from src.rag.retriever import QueryFilters, RAGRetriever
 from src.utils.ais_anomaly import detect_sudden_jump_events_from_parquet
-from src.utils.cloud_bootstrap import ensure_bundle
+from src.utils.cloud_bootstrap import ensure_bundle, ensure_file_manifest
 from src.utils.config import load_config
 from src.utils.runtime import chroma_remote_settings, force_local_vector_env
 from src.utils.serialization import compact_traffic_evidence
@@ -187,9 +187,21 @@ def _maybe_bootstrap_chroma_bundle(preferred_dir: Path) -> tuple[bool, str]:
     if all((preferred_dir / name).exists() for name in required_files):
         return False, f"Chroma runtime assets already exist in {preferred_dir}."
 
+    manifest_url, manifest_source = _load_runtime_setting("APP_CHROMA_MANIFEST_URL")
+    if manifest_url:
+        changed, message = ensure_file_manifest(
+            url=manifest_url,
+            target_dir=preferred_dir,
+            required_files=required_files,
+            timeout_seconds=3600,
+        )
+        if manifest_source != "missing":
+            message = f"{message} Source: {manifest_source}."
+        return changed, message
+
     bundle_url, source = _load_runtime_setting("APP_CHROMA_BUNDLE_URL")
     if not bundle_url:
-        return False, "No APP_CHROMA_BUNDLE_URL configured."
+        return False, "No APP_CHROMA_MANIFEST_URL or APP_CHROMA_BUNDLE_URL configured."
 
     changed, message = ensure_bundle(
         url=bundle_url,

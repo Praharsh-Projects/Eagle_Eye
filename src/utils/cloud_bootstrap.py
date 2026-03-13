@@ -67,3 +67,65 @@ def ensure_bundle(
         else:
             child.unlink(missing_ok=True)
     return False, f"Bundle extracted but required files are still missing in {target}."
+
+
+def ensure_file_manifest(
+    url: str,
+    target_dir: str | Path,
+    required_files: Iterable[str],
+    timeout_seconds: int = 1800,
+) -> Tuple[bool, str]:
+    """
+    Download individual files listed in a JSON manifest into target_dir.
+    Manifest format:
+    {
+      "files": [
+        {"path": "chroma.sqlite3", "url": "https://..."},
+        {"path": "uuid/data_level0.bin", "url": "https://..."},
+        {"path": "uuid/link_lists.bin", "empty": true}
+      ]
+    }
+    """
+    target = Path(target_dir)
+    required = list(required_files)
+    if _has_required_files(target, required):
+        return False, f"Manifest assets already exist in {target}."
+
+    if not url.strip():
+        return False, "Manifest URL is empty."
+
+    target.mkdir(parents=True, exist_ok=True)
+
+    with requests.get(url, timeout=timeout_seconds) as response:
+        response.raise_for_status()
+        manifest = response.json()
+
+    files = manifest.get("files") or []
+    if not isinstance(files, list) or not files:
+        return False, "Manifest is missing a non-empty 'files' list."
+
+    for item in files:
+        rel_path = str(item.get("path", "")).strip()
+        file_url = str(item.get("url", "")).strip()
+        empty = bool(item.get("empty", False))
+        if not rel_path or not file_url:
+            if not rel_path or not empty:
+                continue
+        dest = target / rel_path
+        if dest.exists():
+            continue
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        if empty:
+            dest.touch()
+            continue
+        with requests.get(file_url, stream=True, timeout=timeout_seconds) as response:
+            response.raise_for_status()
+            with dest.open("wb") as fh:
+                for chunk in response.iter_content(chunk_size=1024 * 1024):
+                    if chunk:
+                        fh.write(chunk)
+
+    if _has_required_files(target, required):
+        return True, f"Downloaded manifest assets into {target}."
+
+    return False, f"Manifest downloaded, but required files are still missing in {target}."

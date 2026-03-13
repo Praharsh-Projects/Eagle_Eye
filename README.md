@@ -131,6 +131,8 @@ To bootstrap full processed runtime data on cloud from a hosted bundle, set:
 - `APP_EVENTS_BUNDLE_URL = "https://.../eagle_eye_events_bundle.tar.gz"`
 - Optional for local-bundle retrieval fallback on hosts with enough disk:
 - `APP_CHROMA_BUNDLE_URL = "https://.../eagle_eye_chroma_bundle.tar.gz"`
+- Or, for large Chroma stores split across multiple hosted files:
+- `APP_CHROMA_MANIFEST_URL = "https://.../eagle_eye_chroma_manifest.json"`
 
 Create that bundle locally:
 ```bash
@@ -159,6 +161,7 @@ Cloud parity summary:
 - Retrieval parity: requires remote Chroma service because local `data/chroma` is too large for Streamlit Cloud
 - AIS jump/spoof anomaly parity without retriever: requires `APP_EVENTS_BUNDLE_URL` because those queries need row-level AIS events
 - On non-Streamlit hosts with enough disk, `APP_CHROMA_BUNDLE_URL` can bootstrap a local full vector store and avoid remote Chroma entirely
+- If the full Chroma store is too large for a single archive, use `APP_CHROMA_MANIFEST_URL` to download the store as multiple hosted files
 
 ## 6) Congestion Definition (used in code)
 
@@ -236,6 +239,7 @@ docker run --rm -p 8000:8000 \
   - `APP_PROCESSED_BUNDLE_URL`
   - `APP_EVENTS_BUNDLE_URL`
   - `APP_CHROMA_BUNDLE_URL`
+  - or `APP_CHROMA_MANIFEST_URL`
 - Do not set `VECTOR_DB_MODE=remote`.
 
 This repo also includes `render.yaml` for a Render web-service deployment with an attached disk.
