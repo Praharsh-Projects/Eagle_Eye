@@ -76,6 +76,11 @@ def chroma_remote_settings(config: Optional[Dict[str, Any]] = None) -> Optional[
             "VECTOR_DB_MODE is remote but CHROMA_HOST is not set. "
             "Set CHROMA_HOST (and optionally CHROMA_PORT/CHROMA_SSL)."
         )
+    if host == "YOUR_CHROMA_HOST":
+        raise RuntimeError(
+            "CHROMA_HOST is still the placeholder 'YOUR_CHROMA_HOST'. "
+            "Set it to your real Chroma server hostname."
+        )
 
     return {
         "host": host,

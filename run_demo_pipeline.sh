@@ -26,17 +26,23 @@ if [[ -n "${LIMIT_ROWS:-}" ]]; then
   limit_args+=(--limit_rows "$LIMIT_ROWS")
 fi
 
+run_with_optional_limit() {
+  if [[ ${#limit_args[@]} -gt 0 ]]; then
+    "$@" "${limit_args[@]}"
+  else
+    "$@"
+  fi
+}
+
 echo "[1/7] Building processed prediction datasets..."
-python -m src.predict.data_prep \
+run_with_optional_limit python -m src.predict.data_prep \
   "${csv_args[@]}" \
-  --out_dir data/processed \
-  "${limit_args[@]}"
+  --out_dir data/processed
 
 echo "[2/7] Building KPI tables for deterministic analytics..."
-python -m src.kpi.build_kpis \
+run_with_optional_limit python -m src.kpi.build_kpis \
   "${csv_args[@]}" \
-  --out_dir data/processed \
-  "${limit_args[@]}"
+  --out_dir data/processed
 
 echo "[3/7] Training destination model..."
 python -m src.predict.train_destination \
@@ -74,22 +80,20 @@ if [[ -f "$PDF_ILO" ]]; then
 fi
 
 if [[ ${#pdf_args[@]} -gt 0 ]]; then
-  python -m src.index.build_index \
+  run_with_optional_limit python -m src.index.build_index \
     "${csv_args[@]}" \
     --persist_dir "$PERSIST_DIR" \
     --pdf_paths "${pdf_args[@]}" \
     --doc_urls \
       "https://www.imo.org/en/OurWork/Security/Pages/SOLAS-XI-2%20ISPS-Code.aspx" \
-      "https://www.mpa.gov.sg/web/portal/home/port-of-singapore/operations-and-services/maritime-security/isps-code" \
-    "${limit_args[@]}"
+      "https://www.mpa.gov.sg/web/portal/home/port-of-singapore/operations-and-services/maritime-security/isps-code"
 else
-  python -m src.index.build_index \
+  run_with_optional_limit python -m src.index.build_index \
     "${csv_args[@]}" \
     --persist_dir "$PERSIST_DIR" \
     --doc_urls \
       "https://www.imo.org/en/OurWork/Security/Pages/SOLAS-XI-2%20ISPS-Code.aspx" \
-      "https://www.mpa.gov.sg/web/portal/home/port-of-singapore/operations-and-services/maritime-security/isps-code" \
-    "${limit_args[@]}"
+      "https://www.mpa.gov.sg/web/portal/home/port-of-singapore/operations-and-services/maritime-security/isps-code"
 fi
 
 echo "Done. Run ./run_streamlit.sh"
