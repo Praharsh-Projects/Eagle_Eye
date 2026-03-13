@@ -4,7 +4,8 @@ from __future__ import annotations
 
 import os
 import sys
-from typing import Any
+from pathlib import Path
+from typing import Any, Dict, Optional, Tuple
 
 
 def ensure_supported_python() -> None:
@@ -24,6 +25,87 @@ def import_chromadb() -> Any:
             "Failed to import chromadb. Ensure dependencies are installed in a Python 3.11/3.12 venv."
         ) from exc
     return chromadb
+
+
+def _as_bool(value: Optional[str], default: bool = False) -> bool:
+    if value is None:
+        return default
+    token = str(value).strip().lower()
+    if token in {"1", "true", "yes", "y", "on"}:
+        return True
+    if token in {"0", "false", "no", "n", "off"}:
+        return False
+    return default
+
+
+def chroma_remote_settings(config: Optional[Dict[str, Any]] = None) -> Optional[Dict[str, Any]]:
+    cfg = (config or {}).get("vector_db", {}) if isinstance(config, dict) else {}
+    mode = str(os.getenv("VECTOR_DB_MODE", cfg.get("mode", "local"))).strip().lower()
+    host = str(os.getenv("CHROMA_HOST", cfg.get("chroma_host", ""))).strip()
+    if mode not in {"remote", "http"} and not host:
+        return None
+
+    port_raw = os.getenv("CHROMA_PORT", cfg.get("chroma_port", 8000))
+    try:
+        port = int(port_raw)
+    except Exception:
+        port = 8000
+
+    ssl_raw = os.getenv("CHROMA_SSL", cfg.get("chroma_ssl", False))
+    ssl = _as_bool(str(ssl_raw), default=False)
+
+    tenant = str(os.getenv("CHROMA_TENANT", cfg.get("chroma_tenant", "default_tenant"))).strip()
+    database = str(os.getenv("CHROMA_DATABASE", cfg.get("chroma_database", "default_database"))).strip()
+
+    auth_token = str(
+        os.getenv("CHROMA_AUTH_TOKEN", cfg.get("chroma_auth_token", ""))
+    ).strip()
+    auth_header = str(
+        os.getenv("CHROMA_AUTH_HEADER", cfg.get("chroma_auth_header", "Authorization"))
+    ).strip() or "Authorization"
+
+    headers: Dict[str, str] = {}
+    if auth_token:
+        token_value = auth_token
+        if auth_header.lower() == "authorization" and not auth_token.lower().startswith("bearer "):
+            token_value = f"Bearer {auth_token}"
+        headers[auth_header] = token_value
+
+    if not host:
+        raise RuntimeError(
+            "VECTOR_DB_MODE is remote but CHROMA_HOST is not set. "
+            "Set CHROMA_HOST (and optionally CHROMA_PORT/CHROMA_SSL)."
+        )
+
+    return {
+        "host": host,
+        "port": port,
+        "ssl": ssl,
+        "tenant": tenant or "default_tenant",
+        "database": database or "default_database",
+        "headers": headers or None,
+    }
+
+
+def create_chroma_client(
+    chromadb: Any,
+    persist_dir: str | Path,
+    config: Optional[Dict[str, Any]] = None,
+) -> Tuple[Any, str]:
+    remote = chroma_remote_settings(config=config)
+    if remote:
+        client = chromadb.HttpClient(
+            host=remote["host"],
+            port=int(remote["port"]),
+            ssl=bool(remote["ssl"]),
+            headers=remote.get("headers"),
+            tenant=str(remote.get("tenant", "default_tenant")),
+            database=str(remote.get("database", "default_database")),
+        )
+        return client, "remote_http"
+
+    client = chromadb.PersistentClient(path=str(Path(persist_dir)))
+    return client, "local_persist"
 
 
 def require_openai_api_key() -> str:

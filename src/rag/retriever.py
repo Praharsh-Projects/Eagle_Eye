@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import math
+import os
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Dict, Iterable, List, Optional, Sequence
@@ -13,7 +14,7 @@ from openai import OpenAI
 from src.utils.config import load_config
 from src.utils.serialization import normalize_destination, normalize_identifier
 from src.utils.time import in_date_range
-from src.utils.runtime import import_chromadb, require_openai_api_key
+from src.utils.runtime import create_chroma_client, import_chromadb, require_openai_api_key
 
 
 def _normalize_vessel_type(value: str) -> str:
@@ -135,7 +136,11 @@ class RAGRetriever:
         self.config = load_config(config_path)
         chromadb = import_chromadb()
         self.persist_dir = Path(persist_dir)
-        self.client = chromadb.PersistentClient(path=str(self.persist_dir))
+        self.client, self.vector_backend = create_chroma_client(
+            chromadb=chromadb,
+            persist_dir=self.persist_dir,
+            config=self.config,
+        )
         self.openai = OpenAI(api_key=require_openai_api_key())
         self.embedding_model = self.config["models"]["embedding_model"]
         self.top_k = int(top_k or self.config["retrieval"].get("top_k", 8))
@@ -148,7 +153,12 @@ class RAGRetriever:
         self.docs_collection = self.client.get_or_create_collection(
             name=self.config["index"]["docs_collection"]
         )
-        self.metadata_index_path = self.persist_dir / "traffic_metadata_index.csv"
+        metadata_override = os.getenv("TRAFFIC_METADATA_INDEX_PATH", "").strip()
+        self.metadata_index_path = (
+            Path(metadata_override)
+            if metadata_override
+            else self.persist_dir / "traffic_metadata_index.csv"
+        )
         self._metadata_df: Optional[pd.DataFrame] = None
 
     def _embed_query(self, question: str) -> List[float]:
@@ -162,6 +172,39 @@ class RAGRetriever:
             return None
         self._metadata_df = pd.read_csv(self.metadata_index_path, low_memory=False)
         return self._metadata_df
+
+    def _metadata_df_from_collection(
+        self,
+        filters: Optional[QueryFilters] = None,
+        max_rows: Optional[int] = None,
+    ) -> pd.DataFrame:
+        where = self._build_where(filters or QueryFilters())
+        rows: List[Dict[str, Any]] = []
+        offset = 0
+        batch_size = 2000
+        target_rows = int(max_rows or self.prefilter_candidate_limit)
+
+        while len(rows) < target_rows:
+            limit = min(batch_size, target_rows - len(rows))
+            got = self.traffic_collection.get(
+                where=where,
+                limit=limit,
+                offset=offset,
+                include=["metadatas"],
+            )
+            metas = got.get("metadatas", []) or []
+            if not metas:
+                break
+            for metadata in metas:
+                if isinstance(metadata, dict):
+                    rows.append(metadata)
+            if len(metas) < limit:
+                break
+            offset += len(metas)
+
+        if not rows:
+            return pd.DataFrame()
+        return pd.DataFrame(rows)
 
     def _has_bbox_filter(self, filters: QueryFilters) -> bool:
         f = filters.normalized()
@@ -450,6 +493,8 @@ class RAGRetriever:
             return None
         df = self._load_metadata_df()
         if df is None or df.empty:
+            df = self._metadata_df_from_collection(filters=filters, max_rows=max_ids * 100)
+        if df.empty:
             return {"analysis_type": "count", "count": 0, "rows": []}
 
         f = filters.normalized()
@@ -498,37 +543,79 @@ class RAGRetriever:
         """
         df = self._load_metadata_df()
         if df is None or df.empty:
-            return {"analysis_type": "jump_detection", "count": 0, "rows": []}
+            df = self._metadata_df_from_collection(filters=filters, max_rows=50000)
+        if df.empty:
+            return {"analysis_type": "jump_detection", "count": 0, "rows": [], "events": []}
 
         f = filters.normalized()
         work = df.copy()
-        if f.mmsi:
+        if f.mmsi and "mmsi" in work.columns:
             work = work[work["mmsi"].astype(str).str.strip() == f.mmsi]
-        if f.date_from:
-            work = work[work["timestamp_date"].astype(str) >= f.date_from]
-        if f.date_to:
-            work = work[work["timestamp_date"].astype(str) <= f.date_to]
-        work["latitude"] = pd.to_numeric(work["latitude"], errors="coerce")
-        work["longitude"] = pd.to_numeric(work["longitude"], errors="coerce")
-        work["timestamp_dt"] = pd.to_datetime(work["timestamp_full"], errors="coerce")
+        if "timestamp_date" in work.columns:
+            if f.date_from:
+                work = work[work["timestamp_date"].astype(str) >= f.date_from]
+            if f.date_to:
+                work = work[work["timestamp_date"].astype(str) <= f.date_to]
+        work["latitude"] = pd.to_numeric(work.get("latitude"), errors="coerce")
+        work["longitude"] = pd.to_numeric(work.get("longitude"), errors="coerce")
+        work["timestamp_dt"] = pd.to_datetime(
+            work.get("timestamp_full", work.get("date", pd.Series(dtype=str))),
+            errors="coerce",
+            utc=True,
+        )
+        if "timestamp_date" not in work.columns:
+            work["timestamp_date"] = work["timestamp_dt"].dt.strftime("%Y-%m-%d")
+            if f.date_from:
+                work = work[work["timestamp_date"].astype(str) >= f.date_from]
+            if f.date_to:
+                work = work[work["timestamp_date"].astype(str) <= f.date_to]
+        if "mmsi" not in work.columns:
+            work["mmsi"] = None
         work = work.dropna(subset=["timestamp_dt", "latitude", "longitude", "mmsi"])
         if work.empty:
-            return {"analysis_type": "jump_detection", "count": 0, "rows": []}
+            return {"analysis_type": "jump_detection", "count": 0, "rows": [], "events": []}
 
         work = work.sort_values(["mmsi", "timestamp_dt"])
         jump_ids: List[str] = []
+        jump_events: List[Dict[str, Any]] = []
         for _, group in work.groupby("mmsi"):
-            prev = group.shift(1)
-            dt_minutes = (group["timestamp_dt"] - prev["timestamp_dt"]).dt.total_seconds() / 60.0
-            dlat = group["latitude"] - prev["latitude"]
-            dlon = group["longitude"] - prev["longitude"]
+            g = group.copy()
+            g["prev_timestamp_dt"] = g["timestamp_dt"].shift(1)
+            g["prev_latitude"] = g["latitude"].shift(1)
+            g["prev_longitude"] = g["longitude"].shift(1)
+            dt_minutes = (g["timestamp_dt"] - g["prev_timestamp_dt"]).dt.total_seconds() / 60.0
+            dlat = g["latitude"] - g["prev_latitude"]
+            dlon = g["longitude"] - g["prev_longitude"]
             # Approx rough km distance on Earth surface.
             dist_km = ((dlat * 111.0) ** 2 + (dlon * 111.0) ** 2) ** 0.5
             mask = (dt_minutes > 0) & (dt_minutes <= max_minutes) & (dist_km >= km_threshold)
-            ids = group.loc[mask, "stable_id"].astype(str).tolist()
+            ids = g.loc[mask, "stable_id"].astype(str).tolist()
             jump_ids.extend(ids)
+            if mask.any():
+                flagged = g.loc[mask].copy()
+                flagged["dt_minutes"] = dt_minutes.loc[mask].astype(float)
+                flagged["distance_km"] = dist_km.loc[mask].astype(float)
+                for _, row in flagged.head(200).iterrows():
+                    jump_events.append(
+                        {
+                            "stable_id": str(row.get("stable_id", "")),
+                            "mmsi": str(row.get("mmsi", "")),
+                            "timestamp_full": str(row.get("timestamp_full", "")),
+                            "latitude": _safe_float(row.get("latitude")),
+                            "longitude": _safe_float(row.get("longitude")),
+                            "prev_latitude": _safe_float(row.get("prev_latitude")),
+                            "prev_longitude": _safe_float(row.get("prev_longitude")),
+                            "dt_minutes": float(row.get("dt_minutes", 0.0)),
+                            "distance_km": float(row.get("distance_km", 0.0)),
+                            "port": row.get("locode_norm")
+                            or row.get("locode")
+                            or row.get("destination_norm")
+                            or row.get("port_name_norm"),
+                        }
+                    )
         return {
             "analysis_type": "jump_detection",
             "count": len(jump_ids),
             "rows": jump_ids[:200],
+            "events": jump_events[:200],
         }

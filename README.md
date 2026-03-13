@@ -101,10 +101,9 @@ python -m src.forecast.backtest --processed_dir data/processed
 ./run_streamlit.sh
 ```
 
-Tabs:
-- **Ask**: natural-language routing (A–G taxonomy)
-- **Forecast**: explicit port/day/horizon forecast controls
-- **Evaluate**: model metrics + forecast backtest
+UI:
+- **Ask-only** interface with integrated analytics + forecasting + retrieval evidence trace.
+- Includes answer, evidence, confidence, chart, method steps, and retrieval provenance.
 
 ## 5.1) Streamlit Cloud Deploy
 
@@ -118,6 +117,25 @@ For cloud environments where `data/chroma` is not present, the app auto-falls ba
 
 To enable vector retrieval evidence (`vector_id`, `chunk_id`, distance), set Streamlit secret:
 - `OPENAI_API_KEY = "..."`.
+
+To run full-scale retrieval on cloud (same behavior as local), connect a remote Chroma service:
+- `VECTOR_DB_MODE = "remote"`
+- `CHROMA_HOST = "<your-chroma-host>"`
+- `CHROMA_PORT = "8000"` (or your service port)
+- `CHROMA_SSL = "true"` (for HTTPS services)
+- Optional: `CHROMA_TENANT`, `CHROMA_DATABASE`, `CHROMA_AUTH_TOKEN`, `CHROMA_AUTH_HEADER`
+
+Index directly to remote service:
+```bash
+export VECTOR_DB_MODE=remote
+export CHROMA_HOST=<your-chroma-host>
+export CHROMA_PORT=8000
+export CHROMA_SSL=true
+python -m src.index.build_index \
+  --traffic_csv data/PRJ912.csv \
+  --traffic_csvs data/PRJ896.csv \
+  --persist_dir data/chroma
+```
 
 ## 6) Congestion Definition (used in code)
 
@@ -151,4 +169,5 @@ Out of scope (clean refusal):
 
 - If Chroma fails with Python 3.14, recreate `.venv` with Python 3.12.
 - If RAG evidence is unavailable, ensure `OPENAI_API_KEY` is exported in the same terminal.
-- If Ask/Forecast has no output, run `python -m src.kpi.build_kpis ...` first.
+- If retrieval is disabled on cloud, check Streamlit secrets for `OPENAI_API_KEY` and `CHROMA_*` variables.
+- If Ask has no deterministic output, run `python -m src.kpi.build_kpis ...` first.

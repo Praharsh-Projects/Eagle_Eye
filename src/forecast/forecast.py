@@ -92,58 +92,114 @@ class ForecastEngine:
 
     @staticmethod
     def _confidence_label(sample_count: int, tier: int) -> str:
-        if tier == 1 and sample_count >= 8:
+        if tier <= 2 and sample_count >= 4:
             return "high"
+        if tier <= 4 and sample_count >= 3:
+            return "medium"
         if sample_count >= 5:
             return "medium"
         return "low"
 
     @staticmethod
+    def _congestion_level(value: float) -> str:
+        if value < 0.8:
+            return "below normal"
+        if value < 1.2:
+            return "normal"
+        if value < 1.6:
+            return "elevated"
+        return "high"
+
+    @classmethod
+    def _congestion_meaning(cls, value: float) -> str:
+        level = cls._congestion_level(value)
+        return (
+            f"Congestion index {value:.2f} means {level} pressure. "
+            "Index 1.00 is the port's typical baseline in this dataset; "
+            "values above 1.00 indicate above-baseline traffic pressure."
+        )
+
+    @staticmethod
     def _seasonal_analog(
         series: pd.Series,
         target_date: pd.Timestamp,
-    ) -> tuple[float, float, float, str, int, str]:
+    ) -> tuple[float, float, float, str, int, str, List[str]]:
         hist = series.reset_index()
         hist.columns = ["date", "value"]
         hist["date"] = pd.to_datetime(hist["date"], errors="coerce", utc=True).dt.floor("D")
         hist = hist.dropna(subset=["date", "value"])
+        hist["year"] = hist["date"].dt.year
         hist["month"] = hist["date"].dt.month
+        hist["day"] = hist["date"].dt.day
         hist["day_of_week"] = hist["date"].dt.day_name()
+        iso_parts = hist["date"].dt.isocalendar()
+        hist["iso_week"] = iso_parts["week"].astype(int)
 
         target_month = int(target_date.month)
+        target_day = int(target_date.day)
+        target_week = int(target_date.isocalendar().week)
         target_dow = target_date.day_name()
+        day_gap = (hist["day"] - target_day).abs()
 
         tiers = [
-            ("same month + weekday", (hist["month"] == target_month) & (hist["day_of_week"] == target_dow)),
-            ("same month", (hist["month"] == target_month)),
-            ("same weekday", (hist["day_of_week"] == target_dow)),
-            ("all history", pd.Series(True, index=hist.index)),
+            (
+                "same month-day across years",
+                (hist["month"] == target_month) & (hist["day"] == target_day),
+                1,
+            ),
+            (
+                "same month-day-window (+/-2 days) + weekday",
+                (hist["month"] == target_month) & (day_gap <= 2) & (hist["day_of_week"] == target_dow),
+                2,
+            ),
+            (
+                "same ISO week + weekday",
+                (hist["iso_week"] == target_week) & (hist["day_of_week"] == target_dow),
+                3,
+            ),
+            (
+                "same month + weekday",
+                (hist["month"] == target_month) & (hist["day_of_week"] == target_dow),
+                3,
+            ),
+            ("same month", (hist["month"] == target_month), 5),
+            ("same weekday", (hist["day_of_week"] == target_dow), 5),
+            ("all history", pd.Series(True, index=hist.index), 1),
         ]
 
-        selected = pd.Series(dtype=float)
+        selected = pd.DataFrame()
         tier_label = "all history"
-        tier_idx = 4
-        for idx, (label, mask) in enumerate(tiers, start=1):
-            sample = hist.loc[mask, "value"].astype(float).dropna()
-            if len(sample) >= 3 or idx == len(tiers):
+        tier_idx = len(tiers)
+        for idx, (label, mask, min_count) in enumerate(tiers, start=1):
+            sample = hist.loc[mask, ["date", "value"]].copy()
+            sample["value"] = pd.to_numeric(sample["value"], errors="coerce")
+            sample = sample.dropna(subset=["date", "value"])
+            if len(sample) >= min_count or idx == len(tiers):
                 selected = sample
                 tier_label = label
                 tier_idx = idx
                 break
 
         if selected.empty:
-            return 0.0, 0.0, 0.0, "no analog samples", 0, "low"
+            return 0.0, 0.0, 0.0, "no analog samples", 0, "low", []
 
-        pred = float(selected.mean())
+        selected_values = selected["value"].astype(float)
+        pred = float(selected_values.mean())
         if len(selected) >= 2:
-            lower = float(max(0.0, selected.quantile(0.10)))
-            upper = float(selected.quantile(0.90))
+            lower = float(max(0.0, selected_values.quantile(0.10)))
+            upper = float(selected_values.quantile(0.90))
         else:
             lower = float(max(0.0, pred * 0.80))
             upper = float(pred * 1.20)
 
         confidence = ForecastEngine._confidence_label(sample_count=len(selected), tier=tier_idx)
-        return pred, lower, upper, tier_label, len(selected), confidence
+        analog_dates = (
+            selected.sort_values("date")["date"]
+            .dt.strftime("%Y-%m-%d")
+            .drop_duplicates()
+            .tolist()
+        )
+        return pred, lower, upper, tier_label, len(selected), confidence, analog_dates
 
     def forecast_arrivals(
         self,
@@ -259,6 +315,7 @@ class ForecastEngine:
 
         if target_ts <= last_date and target_ts in series.index:
             actual = float(series.loc[target_ts])
+            meaning = self._congestion_meaning(actual)
             forecast_df = pd.DataFrame(
                 [{"date": target_ts, "predicted": actual, "lower": actual, "upper": actual}]
             )
@@ -266,11 +323,12 @@ class ForecastEngine:
                 status="ok",
                 answer=(
                     f"Observed congestion index at {port or 'selected port'} on {target_ts.strftime('%Y-%m-%d')} "
-                    f"was {actual:.2f}."
+                    f"was {actual:.2f}. {meaning}"
                 ),
                 history=history_df,
                 forecast=forecast_df,
-                coverage_notes=self.kpi.coverage_notes(work, "date"),
+                coverage_notes=self.kpi.coverage_notes(work, "date")
+                + [f"Meaning: {meaning}"],
                 caveats=[
                     "Target date is inside historical coverage; this is observed value, not a future forecast.",
                     "Congestion index is a proxy from arrivals and dwell-time availability, not berth-level operations.",
@@ -286,12 +344,14 @@ class ForecastEngine:
             pred = float(target_row["predicted"])
             lower = float(target_row["lower"])
             upper = float(target_row["upper"])
+            confidence = "high" if days_ahead <= 14 else "medium"
             confidence_note = (
-                f"Confidence: medium (model-based near-term forecast, horizon {days_ahead} day(s))."
+                f"Confidence: {confidence} (model-based near-term forecast, horizon {days_ahead} day(s))."
             )
             method_note = "Method: weekly-seasonal baseline + moving-average model."
+            analog_note = None
         else:
-            pred, lower, upper, tier_label, sample_count, confidence = self._seasonal_analog(
+            pred, lower, upper, tier_label, sample_count, confidence, analog_dates = self._seasonal_analog(
                 series=series,
                 target_date=target_ts,
             )
@@ -302,10 +362,21 @@ class ForecastEngine:
                 f"Confidence: {confidence} (seasonal analog tier: {tier_label}, sample n={sample_count})."
             )
             method_note = f"Method: seasonal historical analog ({tier_label})."
+            analog_note = (
+                "Analog dates used: " + ", ".join(analog_dates[:12])
+                if analog_dates
+                else "Analog dates used: none"
+            )
+
+        meaning = self._congestion_meaning(pred)
+        level = self._congestion_level(pred)
 
         notes = self.kpi.coverage_notes(work, "date")
         notes.append(f"Target date: {target_ts.strftime('%Y-%m-%d')}")
         notes.append(method_note)
+        notes.append(f"Meaning: {meaning}")
+        if analog_note:
+            notes.append(analog_note)
 
         caveats = [
             "Congestion index is a proxy from arrivals and dwell-time availability, not berth-level operations.",
@@ -319,7 +390,8 @@ class ForecastEngine:
             status="ok",
             answer=(
                 f"Predicted congestion index at {port or 'selected port'} on {target_ts.strftime('%Y-%m-%d')} "
-                f"is {pred:.2f} (range {lower:.2f} to {upper:.2f})."
+                f"is {pred:.2f} (range {lower:.2f} to {upper:.2f}). "
+                f"This indicates {level} pressure versus baseline (1.00)."
             ),
             history=history_df,
             forecast=forecast_df,
@@ -374,7 +446,8 @@ class ForecastEngine:
 
         answer = (
             f"Forecasted congestion index for {target} is {mean_pred:.2f} "
-            f"(interval {low_pred:.2f} to {high_pred:.2f}) over the next {horizon_weeks} week(s)."
+            f"(interval {low_pred:.2f} to {high_pred:.2f}) over the next {horizon_weeks} week(s). "
+            f"This indicates {self._congestion_level(mean_pred)} pressure versus baseline (1.00)."
         )
 
         history_df = series.reset_index().rename(columns={"index": "date", "congestion_index": "actual"})
@@ -383,6 +456,7 @@ class ForecastEngine:
         notes = self.kpi.coverage_notes(work, "date")
         notes.append(f"Forecast target weekday: {target}")
         notes.append(f"Forecast horizon: {horizon_weeks} week(s)")
+        notes.append(f"Meaning: {self._congestion_meaning(mean_pred)}")
 
         caveats: List[str] = [
             "Congestion index is a proxy from arrivals and dwell-time availability, not berth-level operations.",

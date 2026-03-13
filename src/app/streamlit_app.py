@@ -21,6 +21,7 @@ from src.kpi.query import AnalyticsResult, KPIQueryEngine
 from src.qa.intent import IntentResult, classify_question
 from src.rag.retriever import QueryFilters, RAGRetriever
 from src.utils.config import load_config
+from src.utils.runtime import chroma_remote_settings
 from src.utils.serialization import compact_traffic_evidence
 
 
@@ -78,6 +79,13 @@ def _resolve_persist_dir(preferred_dir: Path) -> tuple[Path, bool]:
     if (fallback / "chroma.sqlite3").exists():
         return fallback, True
     return preferred_dir, False
+
+
+def _remote_vector_enabled(config: Dict[str, Any]) -> bool:
+    try:
+        return chroma_remote_settings(config=config) is not None
+    except Exception:
+        return False
 
 
 def _parse_anomaly_filter(value: str) -> Optional[bool]:
@@ -235,6 +243,7 @@ def _retrieve_evidence(
         "reason": "Vector rows retrieved successfully." if rows else "No vector rows matched the query and filters.",
         "collection": retriever.config["index"]["traffic_collection"],
         "mode": result.mode,
+        "vector_backend": getattr(retriever, "vector_backend", "unknown"),
         "query_latency_ms": round(latency_ms, 2),
         "returned_items": len(result.evidence),
         "top_k_requested": top_k,
@@ -518,12 +527,43 @@ def _handle_ask_question(
             filters = _make_rag_filters(entities=entities, overrides=user_filters, include_dates=True)
             jumps = retriever.detect_sudden_jumps(filters=filters)
             count = int(jumps.get("count", 0))
+            events = pd.DataFrame(jumps.get("events") or [])
+            chart = None
+            table = None
+            if not events.empty:
+                table_cols = [
+                    c
+                    for c in [
+                        "mmsi",
+                        "timestamp_full",
+                        "distance_km",
+                        "dt_minutes",
+                        "latitude",
+                        "longitude",
+                        "prev_latitude",
+                        "prev_longitude",
+                        "port",
+                        "stable_id",
+                    ]
+                    if c in events.columns
+                ]
+                table = events[table_cols].copy()
+                if {"timestamp_full", "distance_km"}.issubset(events.columns):
+                    chart = (
+                        events.assign(
+                            timestamp_dt=pd.to_datetime(events["timestamp_full"], errors="coerce", utc=True)
+                        )
+                        .dropna(subset=["timestamp_dt"])
+                        .sort_values("timestamp_dt")
+                        .set_index("timestamp_dt")[["distance_km"]]
+                    )
+
             result = AnalyticsResult(
                 status="ok",
                 answer=f"Detected {count} potential sudden AIS coordinate jumps in the filtered range.",
-                table=None,
-                chart=None,
-                coverage_notes=[],
+                table=table,
+                chart=chart,
+                coverage_notes=[f"Rows used: {count}", "Data sources used: AIS metadata index"],
                 caveats=[
                     "Jump rule: coordinate displacement above threshold within 30 minutes.",
                     "This is a heuristic anomaly indicator, not proof of spoofing.",
@@ -587,6 +627,9 @@ def _render_compact_result(
                             f"Forecast target | {row['date'].strftime('%Y-%m-%d')} | "
                             f"pred={float(row['predicted']):.2f}, range={lower:.2f}-{upper:.2f}"
                         )
+            analog_note = next((n for n in value.coverage_notes if n.startswith("Analog dates used:")), None)
+            if analog_note:
+                lines.append(analog_note)
             return lines[:max_items]
 
         if value.table is not None and not value.table.empty:
@@ -621,7 +664,14 @@ def _render_compact_result(
         if isinstance(value, ForecastResult):
             steps.append("Applied active filters (port/date/vessel-type) to the congestion history for this query.")
             for note in value.coverage_notes:
-                if note.startswith("Coverage window:") or note.startswith("Rows used:") or note.startswith("Target date:"):
+                if (
+                    note.startswith("Coverage window:")
+                    or note.startswith("Rows used:")
+                    or note.startswith("Target date:")
+                    or note.startswith("Forecast target weekday:")
+                    or note.startswith("Analog dates used:")
+                    or note.startswith("Meaning:")
+                ):
                     steps.append(note)
             method = next((n for n in value.coverage_notes if n.startswith("Method:")), None)
             if method:
@@ -652,24 +702,65 @@ def _render_compact_result(
         if isinstance(value, ForecastResult) and value.forecast is not None and not value.forecast.empty:
             pred = float(value.forecast["predicted"].mean())
             upper = float(value.forecast["upper"].mean()) if "upper" in value.forecast.columns else pred
+            lower = float(value.forecast["lower"].mean()) if "lower" in value.forecast.columns else pred
             spread = max(0.0, upper - pred)
-            if pred >= 1.5:
-                actions.append("Plan additional berth/pilot/tug capacity on the forecasted peak day window.")
+
+            confidence = _extract_confidence_label(value).lower()
+            if pred >= 1.8:
+                actions.append("Activate high-traffic playbook: reserve extra berth windows and pre-book pilot/tug shifts.")
+                actions.append("Advance-notify terminal and gate teams to smooth truck and yard peaks.")
+            elif pred >= 1.3:
+                actions.append("Pre-allocate buffer berth slots and increase watchstanding in VTS for the target window.")
+                actions.append("Coordinate with agents to stagger ETAs for vessels with flexible arrival windows.")
             else:
-                actions.append("Keep normal berth allocation, but monitor updates as the target date approaches.")
+                actions.append("Run normal berth plan but keep one fallback slot for late-arrival clustering.")
+
+            actions.append(
+                f"Use predicted range {lower:.2f}-{upper:.2f} to set staffing floors/ceilings instead of a single-point plan."
+            )
             if spread >= 0.6:
-                actions.append("Keep an operational buffer due to wider forecast uncertainty.")
-            actions.append("Use the retrieval evidence rows to pre-brief traffic control with similar historical days.")
+                actions.append("Maintain operational contingency: uncertainty is wide, so add tug/pilot standby margin.")
+            if "low" in confidence:
+                actions.append("Refresh this forecast 24-48 hours before execution because confidence is currently low.")
+            actions.append("Use retrieved analog evidence rows to brief operations with concrete historical precedents.")
             return actions
 
         answer_text = value.answer.lower()
         if "jump" in answer_text or "anomaly" in answer_text:
             actions.append("Open AIS integrity checks for listed MMSI and validate with external tracking feeds.")
             actions.append("Flag suspicious tracks for VTS review before acting on route deviations.")
+            actions.append("Prioritize vessels with repeated jump flags for manual watchlist monitoring.")
         else:
             actions.append("Use the daily/weekly pattern in the chart to plan shift staffing and pilot windows.")
             actions.append("Re-run this query with tighter vessel-type filters for targeted operational planning.")
+            actions.append("Apply port-vs-port comparisons to rebalance pilot/tug resources across nearby ports.")
         return actions
+
+    def _build_evidence_backed_answer(
+        value: Union[AnalyticsResult, ForecastResult],
+        bundle: EvidenceBundle,
+    ) -> Optional[str]:
+        if value.status == "ok" or not bundle.rows:
+            return None
+        df = pd.DataFrame(bundle.rows)
+        if df.empty:
+            return None
+        port_text = "unknown port"
+        if "port" in df.columns and df["port"].notna().any():
+            top_port = (
+                df["port"].dropna().astype(str).value_counts().index.tolist()[:1]
+            )
+            if top_port:
+                port_text = top_port[0]
+        date_span = ""
+        if "timestamp" in df.columns:
+            ts = pd.to_datetime(df["timestamp"], errors="coerce", utc=True).dropna()
+            if not ts.empty:
+                date_span = f" between {ts.min().strftime('%Y-%m-%d')} and {ts.max().strftime('%Y-%m-%d')}"
+        return (
+            f"Direct KPI aggregation returned no exact match, but vector retrieval found {len(df)} relevant records "
+            f"for {port_text}{date_span}. This is evidence-backed retrieval output, not a deterministic aggregate."
+        )
 
     def _to_naive_datetime(series: pd.Series) -> pd.Series:
         parsed = pd.to_datetime(series, errors="coerce", utc=True)
@@ -822,6 +913,15 @@ def _render_compact_result(
 
     st.subheader("Answer")
     st.write(result.answer)
+    evidence_backed = _build_evidence_backed_answer(result, evidence)
+    if evidence_backed:
+        st.info(evidence_backed)
+
+    if isinstance(result, ForecastResult):
+        meaning_note = next((n for n in result.coverage_notes if n.startswith("Meaning:")), None)
+        if meaning_note:
+            st.subheader("Forecast Meaning")
+            st.write(meaning_note.split(":", 1)[1].strip())
 
     st.subheader("Evidence")
     retrieved_lines = evidence.lines
@@ -862,10 +962,14 @@ def _render_compact_result(
     if trace:
         st.write(
             f"Collection: `{trace.get('collection', 'n/a')}` | "
+            f"Backend: `{trace.get('vector_backend', 'n/a')}` | "
             f"Mode: `{trace.get('mode', 'n/a')}` | "
             f"Latency: `{trace.get('query_latency_ms', 'n/a')} ms` | "
             f"Returned: `{trace.get('returned_items', 0)}`"
         )
+        where_used = trace.get("where_filter")
+        if where_used not in (None, "", {}):
+            st.write(f"Where filter: `{where_used}`")
     if evidence.rows:
         trace_df = pd.DataFrame(evidence.rows)
         cols = [c for c in ["vector_id", "chunk_id", "distance", "timestamp", "port", "vessel_type", "mmsi"] if c in trace_df.columns]
@@ -886,7 +990,15 @@ def main() -> None:
     configured_processed_dir = Path(config.get("predict", {}).get("processed_dir", "data/processed"))
     default_processed_dir, using_demo_processed = _resolve_processed_dir(configured_processed_dir)
     configured_persist_dir = Path(config["paths"].get("persist_dir", "data/chroma"))
-    persist_dir, using_demo_chroma = _resolve_persist_dir(configured_persist_dir)
+    requested_vector_mode = str(
+        os.getenv("VECTOR_DB_MODE", config.get("vector_db", {}).get("mode", "local"))
+    ).strip().lower()
+    using_remote_vector = _remote_vector_enabled(config)
+    if using_remote_vector:
+        persist_dir = configured_persist_dir
+        using_demo_chroma = False
+    else:
+        persist_dir, using_demo_chroma = _resolve_persist_dir(configured_persist_dir)
 
     with st.sidebar:
         st.subheader("Ask Settings")
@@ -894,8 +1006,12 @@ def main() -> None:
         st.caption("Keep questions specific (port + date helps).")
         if using_demo_processed:
             st.info("Running with bundled demo processed data (`demo_data/processed`).")
+        if using_remote_vector:
+            st.info("Using remote Chroma service (configured via CHROMA_* / VECTOR_DB_MODE).")
         if using_demo_chroma:
             st.info("Running with bundled demo vector index (`demo_data/chroma`).")
+        if requested_vector_mode in {"remote", "http"} and not using_remote_vector:
+            st.warning("VECTOR_DB_MODE is remote but CHROMA_HOST is missing/invalid; using local/demo index.")
 
     try:
         kpi_engine = _init_kpi_engine(str(default_processed_dir))
@@ -911,7 +1027,9 @@ def main() -> None:
     if api_key:
         try:
             retriever = _init_retriever(persist_dir=str(persist_dir), config_path=config_path)
-            retriever_reason = f"Retriever active (API key source: {key_source})."
+            retriever_reason = (
+                f"Retriever active (API key source: {key_source}, backend: {retriever.vector_backend})."
+            )
         except Exception as exc:
             retriever = None
             retriever_reason = f"Retriever init failed: {exc}"

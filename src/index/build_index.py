@@ -12,7 +12,7 @@ from openai import OpenAI
 from src.ingest.pdf_ingest import discover_pdfs, ingest_pdfs
 from src.ingest.traffic_ingest import TrafficIngestResult, ingest_traffic_csv
 from src.utils.config import load_config
-from src.utils.runtime import import_chromadb, require_openai_api_key
+from src.utils.runtime import create_chroma_client, import_chromadb, require_openai_api_key
 
 
 def _batched(items: Sequence[Any], batch_size: int) -> Iterable[Sequence[Any]]:
@@ -112,8 +112,13 @@ def main() -> None:
     persist_dir = Path(args.persist_dir or config["paths"]["persist_dir"])
     persist_dir.mkdir(parents=True, exist_ok=True)
 
-    chroma_client = chromadb.PersistentClient(path=str(persist_dir))
+    chroma_client, vector_backend = create_chroma_client(
+        chromadb=chromadb,
+        persist_dir=persist_dir,
+        config=config,
+    )
     openai_client = OpenAI(api_key=require_openai_api_key())
+    print(f"Vector backend: {vector_backend}")
 
     if rebuild:
         for name in (traffic_collection_name, docs_collection_name):
