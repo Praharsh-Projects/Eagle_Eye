@@ -96,6 +96,23 @@ wait_for_tunnel_url() {
   exit 1
 }
 
+wait_for_public_ready() {
+  local url="$1"
+  local attempts=30
+  local i
+  for ((i=1; i<=attempts; i++)); do
+    local code
+    code="$(curl -o /dev/null -s -w '%{http_code}' "${url}" || true)"
+    if [[ "${code}" == "200" ]]; then
+      return 0
+    fi
+    sleep 2
+  done
+  printf 'Error: public tunnel URL did not become reachable: %s\n' "${url}" >&2
+  cat "${TUNNEL_LOG}" >&2 || true
+  exit 1
+}
+
 start_tunnel() {
   if [[ -n "${NGROK_DOMAIN:-}" ]] && command -v ngrok >/dev/null 2>&1; then
     print_step "5/6" "Starting ngrok tunnel with custom domain"
@@ -127,9 +144,10 @@ start_tunnel() {
 
   if command -v cloudflared >/dev/null 2>&1; then
     print_step "5/6" "Starting free Cloudflare tunnel"
-    cloudflared tunnel --url "${LOCAL_URL}" >"${TUNNEL_LOG}" 2>&1 &
+    cloudflared tunnel --protocol http2 --url "${LOCAL_URL}" >"${TUNNEL_LOG}" 2>&1 &
     TUNNEL_PID=$!
     wait_for_tunnel_url 'https://[-a-zA-Z0-9.]+\.trycloudflare\.com'
+    wait_for_public_ready "${TUNNEL_URL}"
     return 0
   fi
 
@@ -138,6 +156,7 @@ start_tunnel() {
     ngrok http 8501 --log=stdout >"${TUNNEL_LOG}" 2>&1 &
     TUNNEL_PID=$!
     wait_for_tunnel_url 'https://[-a-zA-Z0-9.]+\.ngrok[-a-zA-Z0-9.]*'
+    wait_for_public_ready "${TUNNEL_URL}"
     return 0
   fi
 
