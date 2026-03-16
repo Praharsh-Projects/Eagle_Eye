@@ -31,7 +31,7 @@ SAMPLE_QUERIES = [
     "How many vessel arrivals were recorded at SEGOT in March 2022?",
     "Which weekday is usually busiest at LVVNT?",
     "Compare Friday and Monday arrivals at GDANSK in March 2022.",
-    "Show suspicious AIS jumps for MMSI 212575000 on 2021-01-01.",
+    "Show suspicious AIS jumps for MMSI 246521000 on 2022-03-10.",
     "For MMSI 266232000, summarize movement and destination changes on 2021-01-01.",
     "What will congestion be at LVVNT on Friday, February 20, 2026?",
     "Predict congestion for SEGOT next Friday based on historical patterns.",
@@ -628,15 +628,18 @@ def _handle_ask_question(
         if any(token in q_lower for token in ("jump", "spoof", "teleport", "impossible")):
             filters = _make_rag_filters(entities=entities, overrides=user_filters, include_dates=True)
             jump_result: Dict[str, Any]
-            if retriever is not None:
-                jump_result = retriever.detect_sudden_jumps(filters=filters)
-            elif events_path and events_path.exists():
+            jump_source = ""
+            if events_path and events_path.exists():
                 jump_result = detect_sudden_jump_events_from_parquet(
                     events_path=events_path,
                     mmsi=filters.mmsi,
                     date_from=filters.date_from,
                     date_to=filters.date_to,
                 )
+                jump_source = "row-level AIS events parquet"
+            elif retriever is not None:
+                jump_result = retriever.detect_sudden_jumps(filters=filters)
+                jump_source = "AIS metadata index"
             else:
                 return (
                     AnalyticsResult(
@@ -664,7 +667,9 @@ def _handle_ask_question(
                         "mmsi",
                         "timestamp_full",
                         "distance_km",
+                        "implied_speed_kn",
                         "dt_minutes",
+                        "trigger_rule",
                         "latitude",
                         "longitude",
                         "prev_latitude",
@@ -685,17 +690,22 @@ def _handle_ask_question(
                         .set_index("timestamp_dt")[["distance_km"]]
                     )
 
+            if count > 0:
+                answer = f"Detected {count} potential sudden AIS coordinate jumps in the filtered range."
+            else:
+                answer = "No sudden AIS coordinate jumps were detected in the filtered range."
+
             result = AnalyticsResult(
                 status="ok",
-                answer=f"Detected {count} potential sudden AIS coordinate jumps in the filtered range.",
+                answer=answer,
                 table=table,
                 chart=chart,
                 coverage_notes=[
                     f"Rows used: {count}",
-                    "Data sources used: AIS metadata index" if retriever is not None else "Data sources used: row-level AIS events parquet",
+                    f"Data sources used: {jump_source}",
                 ],
                 caveats=[
-                    "Jump rule: coordinate displacement above threshold within 30 minutes.",
+                    "Jump rule: distance >= 20 km within 30 minutes, or implied speed >= 40 kn with >= 5 km displacement.",
                     "This is a heuristic anomaly indicator, not proof of spoofing.",
                 ],
             )

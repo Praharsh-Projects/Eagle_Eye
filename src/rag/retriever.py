@@ -44,6 +44,21 @@ def _safe_float(value: Any) -> Optional[float]:
             return None
 
 
+def _first_present(*values: Any) -> Optional[str]:
+    for value in values:
+        if value is None:
+            continue
+        try:
+            if pd.isna(value):
+                continue
+        except Exception:
+            pass
+        text = str(value).strip()
+        if text and text.lower() not in {"nan", "none", "nat"}:
+            return text
+    return None
+
+
 def _batched(items: Sequence[str], batch_size: int) -> Iterable[Sequence[str]]:
     for start in range(0, len(items), batch_size):
         yield items[start : start + batch_size]
@@ -536,7 +551,12 @@ class RAGRetriever:
         return {"analysis_type": "count", "count": int(len(filtered)), "rows": ids}
 
     def detect_sudden_jumps(
-        self, filters: QueryFilters, max_minutes: int = 30, km_threshold: float = 80.0
+        self,
+        filters: QueryFilters,
+        max_minutes: int = 30,
+        km_threshold: float = 20.0,
+        speed_kn_threshold: float = 40.0,
+        min_distance_km_for_speed_rule: float = 5.0,
     ) -> Dict[str, Any]:
         """
         Detect likely suspicious jumps for a single MMSI within time window.
@@ -549,8 +569,10 @@ class RAGRetriever:
 
         f = filters.normalized()
         work = df.copy()
+        if "mmsi" in work.columns:
+            work["mmsi"] = work["mmsi"].astype(str).map(normalize_identifier)
         if f.mmsi and "mmsi" in work.columns:
-            work = work[work["mmsi"].astype(str).str.strip() == f.mmsi]
+            work = work[work["mmsi"] == f.mmsi]
         if "timestamp_date" in work.columns:
             if f.date_from:
                 work = work[work["timestamp_date"].astype(str) >= f.date_from]
@@ -588,13 +610,35 @@ class RAGRetriever:
             dlon = g["longitude"] - g["prev_longitude"]
             # Approx rough km distance on Earth surface.
             dist_km = ((dlat * 111.0) ** 2 + (dlon * 111.0) ** 2) ** 0.5
-            mask = (dt_minutes > 0) & (dt_minutes <= max_minutes) & (dist_km >= km_threshold)
+            implied_speed_kn = ((dist_km / (dt_minutes / 60.0)) / 1.852).replace(
+                [float("inf"), float("-inf")], pd.NA
+            )
+            mask = (
+                (dt_minutes > 0)
+                & (dt_minutes <= max_minutes)
+                & (
+                    (dist_km >= km_threshold)
+                    | (
+                        (dist_km >= min_distance_km_for_speed_rule)
+                        & (implied_speed_kn >= speed_kn_threshold)
+                    )
+                )
+            )
             ids = g.loc[mask, "stable_id"].astype(str).tolist()
             jump_ids.extend(ids)
             if mask.any():
                 flagged = g.loc[mask].copy()
                 flagged["dt_minutes"] = dt_minutes.loc[mask].astype(float)
                 flagged["distance_km"] = dist_km.loc[mask].astype(float)
+                flagged["implied_speed_kn"] = implied_speed_kn.loc[mask].astype(float)
+                flagged["trigger_rule"] = flagged.apply(
+                    lambda row: (
+                        "distance_threshold"
+                        if float(row.get("distance_km", 0.0)) >= km_threshold
+                        else "speed_threshold"
+                    ),
+                    axis=1,
+                )
                 for _, row in flagged.head(200).iterrows():
                     jump_events.append(
                         {
@@ -607,10 +651,14 @@ class RAGRetriever:
                             "prev_longitude": _safe_float(row.get("prev_longitude")),
                             "dt_minutes": float(row.get("dt_minutes", 0.0)),
                             "distance_km": float(row.get("distance_km", 0.0)),
-                            "port": row.get("locode_norm")
-                            or row.get("locode")
-                            or row.get("destination_norm")
-                            or row.get("port_name_norm"),
+                            "implied_speed_kn": float(row.get("implied_speed_kn", 0.0)),
+                            "trigger_rule": str(row.get("trigger_rule", "")),
+                            "port": _first_present(
+                                row.get("locode_norm"),
+                                row.get("locode"),
+                                row.get("destination_norm"),
+                                row.get("port_name_norm"),
+                            ),
                         }
                     )
         return {

@@ -7,6 +7,8 @@ from typing import Any, Dict, List, Optional
 
 import pandas as pd
 
+from src.utils.serialization import normalize_identifier
+
 
 def _safe_float(value: Any) -> Optional[float]:
     try:
@@ -20,13 +22,30 @@ def _safe_float(value: Any) -> Optional[float]:
         return None
 
 
+def _first_present(*values: Any) -> Optional[str]:
+    for value in values:
+        if value is None:
+            continue
+        try:
+            if pd.isna(value):
+                continue
+        except Exception:
+            pass
+        text = str(value).strip()
+        if text and text.lower() not in {"nan", "none", "nat"}:
+            return text
+    return None
+
+
 def detect_sudden_jump_events_from_parquet(
     events_path: str | Path,
     mmsi: Optional[str] = None,
     date_from: Optional[str] = None,
     date_to: Optional[str] = None,
     max_minutes: int = 30,
-    km_threshold: float = 80.0,
+    km_threshold: float = 20.0,
+    speed_kn_threshold: float = 40.0,
+    min_distance_km_for_speed_rule: float = 5.0,
     limit: int = 200,
 ) -> Dict[str, Any]:
     path = Path(events_path)
@@ -40,8 +59,10 @@ def detect_sudden_jump_events_from_parquet(
     work = df.copy()
     if "event_kind" in work.columns:
         work = work[work["event_kind"].astype(str) == "ais_position"]
+    if "mmsi" in work.columns:
+        work["mmsi"] = work["mmsi"].astype(str).map(normalize_identifier)
     if mmsi and "mmsi" in work.columns:
-        work = work[work["mmsi"].astype(str).str.strip() == str(mmsi).strip()]
+        work = work[work["mmsi"] == normalize_identifier(str(mmsi).strip())]
 
     timestamp_source = "timestamp_full" if "timestamp_full" in work.columns else "timestamp"
     if timestamp_source not in work.columns:
@@ -76,11 +97,34 @@ def detect_sudden_jump_events_from_parquet(
         dlat = g["latitude"] - g["prev_latitude"]
         dlon = g["longitude"] - g["prev_longitude"]
         dist_km = ((dlat * 111.0) ** 2 + (dlon * 111.0) ** 2) ** 0.5
-        flagged = g[(dt_minutes > 0) & (dt_minutes <= max_minutes) & (dist_km >= km_threshold)].copy()
+        implied_speed_kn = ((dist_km / (dt_minutes / 60.0)) / 1.852).replace(
+            [float("inf"), float("-inf")], pd.NA
+        )
+        jump_mask = (
+            (dt_minutes > 0)
+            & (dt_minutes <= max_minutes)
+            & (
+                (dist_km >= km_threshold)
+                | (
+                    (dist_km >= min_distance_km_for_speed_rule)
+                    & (implied_speed_kn >= speed_kn_threshold)
+                )
+            )
+        )
+        flagged = g[jump_mask].copy()
         if flagged.empty:
             continue
         flagged["dt_minutes"] = dt_minutes.loc[flagged.index].astype(float)
         flagged["distance_km"] = dist_km.loc[flagged.index].astype(float)
+        flagged["implied_speed_kn"] = implied_speed_kn.loc[flagged.index].astype(float)
+        flagged["trigger_rule"] = flagged.apply(
+            lambda row: (
+                "distance_threshold"
+                if float(row.get("distance_km", 0.0)) >= km_threshold
+                else "speed_threshold"
+            ),
+            axis=1,
+        )
         for _, row in flagged.iterrows():
             events.append(
                 {
@@ -93,10 +137,14 @@ def detect_sudden_jump_events_from_parquet(
                     "prev_longitude": _safe_float(row.get("prev_longitude")),
                     "dt_minutes": float(row.get("dt_minutes", 0.0)),
                     "distance_km": float(row.get("distance_km", 0.0)),
-                    "port": row.get("locode_norm")
-                    or row.get("locode")
-                    or row.get("destination_norm")
-                    or row.get("port_name_norm"),
+                    "implied_speed_kn": float(row.get("implied_speed_kn", 0.0)),
+                    "trigger_rule": str(row.get("trigger_rule", "")),
+                    "port": _first_present(
+                        row.get("locode_norm"),
+                        row.get("locode"),
+                        row.get("destination_norm"),
+                        row.get("port_name_norm"),
+                    ),
                 }
             )
             if len(events) >= limit:
