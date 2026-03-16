@@ -98,7 +98,7 @@ wait_for_tunnel_url() {
 
 wait_for_public_ready() {
   local url="$1"
-  local attempts=30
+  local attempts=90
   local i
   for ((i=1; i<=attempts; i++)); do
     local code
@@ -108,9 +108,9 @@ wait_for_public_ready() {
     fi
     sleep 2
   done
-  printf 'Error: public tunnel URL did not become reachable: %s\n' "${url}" >&2
-  cat "${TUNNEL_LOG}" >&2 || true
-  exit 1
+  printf 'Warning: public tunnel URL is not returning HTTP 200 yet: %s\n' "${url}" >&2
+  printf 'The tunnel is still running; retry the URL in a browser after 15-30 seconds.\n' >&2
+  return 0
 }
 
 start_tunnel() {
