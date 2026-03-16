@@ -27,7 +27,7 @@ def _norm_boundary(value: str) -> str:
 
 def _norm_pollutants(values: Optional[Sequence[str]]) -> List[str]:
     if not values:
-        return ["CO2", "NOx", "SOx", "PM"]
+        return ["CO2e", "NOx", "SOx", "PM"]
     out: List[str] = []
     for item in values:
         token = str(item).strip().upper()
@@ -35,7 +35,7 @@ def _norm_pollutants(values: Optional[Sequence[str]]) -> List[str]:
             fixed = token.replace("NOX", "NOx").replace("SOX", "SOx").replace("CO2E", "CO2e")
             if fixed not in out:
                 out.append(fixed)
-    return out or ["CO2", "NOx", "SOx", "PM"]
+    return out or ["CO2e", "NOx", "SOx", "PM"]
 
 
 def _metric_column(pollutant: str, boundary: str) -> str:
@@ -207,7 +207,7 @@ class CarbonQueryEngine:
             coverage_notes=[message],
             caveats=["Run `python -m src.carbon.build --processed_dir data/processed` to materialize carbon outputs."],
             boundary=boundary,
-            pollutants=pollutants or ["CO2"],
+            pollutants=pollutants or ["CO2e"],
             source_label="Computed with fallback defaults",
             confidence_label="low",
             confidence_reason="Missing carbon artifacts for deterministic computation.",
@@ -343,7 +343,7 @@ class CarbonQueryEngine:
         port_label = port_id or "the selected scope"
         answer = (
             f"{boundary} emissions for {port_label} were computed from deterministic segmentation. "
-            f"Total {total_co2e_key}={total_point:.2f} ({total_low:.2f}-{total_up:.2f})."
+            f"Total {total_co2e_key}={total_point:.2f} tCO2e ({total_low:.2f}-{total_up:.2f} tCO2e)."
         )
         coverage = [
             f"Coverage rows: {len(work):,}",
@@ -352,10 +352,12 @@ class CarbonQueryEngine:
             f"Group by: {group_by}",
             "Source label: " + source_label,
             f"Fallback usage ratio: {fallback_ratio:.2f}",
+            "Unit standard: absolute greenhouse-gas values are expressed in tCO2e.",
         ]
         caveats = [
             "Confidence expresses evidence/assumption strength, not certainty.",
             "Carbon estimates use deterministic heuristics with mode segmentation and local factor pack.",
+            "Results are estimated and proxy-based inventory outputs, not direct stack measurements.",
         ]
 
         payload = {
@@ -368,6 +370,13 @@ class CarbonQueryEngine:
             "params_version": str(self.params_version.get("version", "unknown")),
             "evidence_ids": evidence_ids,
             "segment_ids": segment_ids,
+            "units": {
+                "absolute_emissions": "tCO2e",
+                "intensity_examples": ["kgCO2e/vessel-call", "tCO2e/day", "kgCO2e/hour"],
+                "time": "UTC (24-hour format)",
+                "distance": "nautical miles (nm)",
+                "speed": "knots (kn)",
+            },
             "rows": table.to_dict(orient="records"),
         }
         export_csv, export_json = self._write_exports("carbon_port_emissions", table, payload)
@@ -455,7 +464,10 @@ class CarbonQueryEngine:
                 if "segment_id" in ev.columns:
                     segment_ids = ev["segment_id"].astype(str).head(30).tolist()
 
-        answer = f"{boundary} emissions for call `{call_id}` (MMSI {mmsi}) were computed deterministically."
+        answer = (
+            f"{boundary} emissions for call `{call_id}` (MMSI {mmsi}) were computed deterministically "
+            "with greenhouse-gas values reported as tCO2e."
+        )
         payload = {
             "boundary": boundary,
             "pollutants": pollutants_list,
@@ -466,6 +478,13 @@ class CarbonQueryEngine:
             "params_version": str(self.params_version.get("version", "unknown")),
             "evidence_ids": evidence_ids,
             "segment_ids": segment_ids,
+            "units": {
+                "absolute_emissions": "tCO2e",
+                "intensity_examples": ["kgCO2e/vessel-call", "tCO2e/day", "kgCO2e/hour"],
+                "time": "UTC (24-hour format)",
+                "distance": "nautical miles (nm)",
+                "speed": "knots (kn)",
+            },
             "rows": table.to_dict(orient="records"),
         }
         export_csv, export_json = self._write_exports("carbon_vessel_call", table, payload)
@@ -484,6 +503,7 @@ class CarbonQueryEngine:
                 f"Rows used: {len(work)}",
                 f"Boundary: {boundary}",
                 f"Fallback usage ratio: {fallback_ratio:.2f}",
+                "Unit standard: absolute greenhouse-gas values are expressed in tCO2e.",
             ],
             caveats=caveats,
             boundary=boundary,
@@ -563,7 +583,7 @@ class CarbonQueryEngine:
 
         answer = (
             f"Carbon estimate computed for {mode} mode ({boundary}) using explicit assumptions. "
-            f"Fuel={fuel_t:.3f} t, CO2={co2_t:.3f} t."
+            f"Fuel={fuel_t:.3f} t, CO2e={ttw_co2e_t:.3f} tCO2e."
         )
         payload_out = {
             "boundary": boundary,
@@ -574,6 +594,13 @@ class CarbonQueryEngine:
             "uncertainty_interval": uncertainty,
             "params_version": str(self.params_version.get("version", "unknown")),
             "evidence_ids": [],
+            "units": {
+                "absolute_emissions": "tCO2e",
+                "intensity_examples": ["kgCO2e/vessel-call", "tCO2e/day", "kgCO2e/hour"],
+                "time": "UTC (24-hour format)",
+                "distance": "nautical miles (nm)",
+                "speed": "knots (kn)",
+            },
             "rows": row.to_dict(orient="records"),
             "assumptions": payload,
         }
@@ -586,7 +613,12 @@ class CarbonQueryEngine:
             answer=answer,
             table=row,
             chart=None,
-            coverage_notes=["Mode: " + mode, "Boundary: " + boundary, "Assumptions provided explicitly."],
+            coverage_notes=[
+                "Mode: " + mode,
+                "Boundary: " + boundary,
+                "Assumptions provided explicitly.",
+                "Unit standard: absolute greenhouse-gas values are expressed in tCO2e.",
+            ],
             caveats=caveats,
             boundary=boundary,
             pollutants=pollutants,

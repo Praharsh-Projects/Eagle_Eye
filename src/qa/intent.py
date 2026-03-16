@@ -263,9 +263,9 @@ def _extract_carbon_pollutants(question: str) -> List[str]:
     if re.search(r"\bpm\b", q) or "particulate" in q:
         out.append("PM")
     if any(token in q for token in ("pollutant", "pollutants", "emissions")) and not out:
-        out = ["CO2", "NOx", "SOx", "PM"]
+        out = ["CO2e", "NOx", "SOx", "PM"]
     if not out:
-        out = ["CO2", "NOx", "SOx", "PM"]
+        out = ["CO2e", "NOx", "SOx", "PM"]
     return out
 
 

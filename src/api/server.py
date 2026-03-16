@@ -7,11 +7,23 @@ from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple, Union
 
+import numpy as np
 import pandas as pd
 from fastapi import FastAPI, HTTPException, Query
 from pydantic import BaseModel, Field
 
 from src.carbon.query import CarbonQueryEngine, CarbonResult
+from src.carbon.presentation import (
+    build_emissions_findings,
+    build_reduction_suggestions,
+    classify_level,
+    compute_emissions_metrics,
+    derive_threshold_bands,
+    extract_chart_findings,
+    format_percent,
+    format_tco2e,
+    sanitize_threshold_percentiles,
+)
 from src.forecast.forecast import ForecastEngine, ForecastResult
 from src.kpi.query import AnalyticsResult, KPIQueryEngine
 from src.qa.intent import IntentResult, classify_question
@@ -630,6 +642,7 @@ def _handle_ask_question_api(
 def _serialize_result(
     result: Union[AnalyticsResult, ForecastResult, CarbonResult],
     evidence: EvidenceBundle,
+    threshold_percentiles: Tuple[float, float, float] = (0.25, 0.50, 0.75),
 ) -> Dict[str, Any]:
     payload: Dict[str, Any] = {
         "status": result.status,
@@ -648,6 +661,42 @@ def _serialize_result(
         "retrieval_provenance": evidence.trace,
     }
     if isinstance(result, CarbonResult):
+        metrics = compute_emissions_metrics(result.table, result.boundary)
+        total = float(metrics.get("total_tco2e") or 0.0)
+        table_metric_col = "wtw_co2e_t" if result.boundary == "WTW" else "ttw_co2e_t"
+        if result.table is not None and table_metric_col not in result.table.columns:
+            table_metric_col = "co2_t" if "co2_t" in result.table.columns else table_metric_col
+        hist_values = (
+            pd.to_numeric(result.table.get(table_metric_col), errors="coerce").dropna().tolist()
+            if result.table is not None and table_metric_col in result.table.columns
+            else []
+        )
+        bands = derive_threshold_bands(hist_values, percentiles=threshold_percentiles)
+        level = classify_level(total, bands)
+        hist_median = float(np.median(hist_values)) if hist_values else None
+        change_vs_median_pct = (((total - hist_median) / hist_median) * 100.0) if hist_median and hist_median > 0 else None
+        ci_item = result.uncertainty_interval.get("CO2e") or result.uncertainty_interval.get("CO2") or {}
+        point = float(ci_item.get("point", 0.0))
+        lower = float(ci_item.get("lower", 0.0))
+        upper = float(ci_item.get("upper", 0.0))
+        ci_width_rel = ((upper - lower) / point) if point > 0 else None
+        chart_df = _pick_chart(result)
+        chart_findings = extract_chart_findings(chart_df if chart_df is not None else pd.DataFrame(), target_ts=None, max_findings=5)
+        findings = build_emissions_findings(
+            current_tco2e=total,
+            level=level,
+            change_vs_median_pct=change_vs_median_pct,
+            source_label=result.source_label,
+            ci_width_rel=ci_width_rel,
+            chart_findings=chart_findings,
+        )
+        suggestions = build_reduction_suggestions(
+            level=level,
+            change_vs_median_pct=change_vs_median_pct,
+            ci_width_rel=ci_width_rel,
+            source_label=result.source_label,
+        )
+
         payload["carbon"] = {
             "boundary": result.boundary,
             "pollutants": result.pollutants,
@@ -660,7 +709,46 @@ def _serialize_result(
             "segment_ids": result.segment_ids,
             "export_csv_path": result.export_csv_path,
             "export_json_path": result.export_json_path,
+            "units": {
+                "absolute_emissions": "tCO2e (auto-scales to ktCO2e/MtCO2e in UI)",
+                "intensity_per_call": "kgCO2e/vessel-call",
+                "per_day": "tCO2e/day",
+                "per_hour": "kgCO2e/hour",
+                "threshold_basis": bands.source_label,
+            },
+            "relative_scale": {
+                "classification": level,
+                "basis": bands.source_label,
+                "thresholds_tco2e": {"p25": bands.p25, "p50": bands.p50, "p75": bands.p75},
+                "current_tco2e": total,
+                "current_display": format_tco2e(total),
+            },
+            "metrics": {
+                "total_emissions": format_tco2e(total),
+                "intensity_kgco2e_per_vessel_call": (
+                    f"{float(metrics['intensity_kg_per_call']):.1f} kgCO2e/vessel-call"
+                    if metrics.get("intensity_kg_per_call") is not None
+                    else None
+                ),
+                "tco2e_per_day": (
+                    f"{float(metrics['tco2e_per_day']):.2f} tCO2e/day"
+                    if metrics.get("tco2e_per_day") is not None
+                    else None
+                ),
+                "kgco2e_per_hour": (
+                    f"{float(metrics['kgco2e_per_hour']):.2f} kgCO2e/hour"
+                    if metrics.get("kgco2e_per_hour") is not None
+                    else None
+                ),
+                "relative_level": level,
+                "change_vs_historical_median": (
+                    format_percent(change_vs_median_pct) if change_vs_median_pct is not None else None
+                ),
+            },
+            "findings": findings,
+            "emissions_reduction_suggestions": suggestions,
         }
+        payload["recommendations"] = suggestions
     return payload
 
 
@@ -669,6 +757,9 @@ def _build_state() -> Dict[str, Any]:
     config = load_config(config_path)
     configured_processed_dir = Path(config.get("predict", {}).get("processed_dir", "data/processed"))
     carbon_cfg = config.get("carbon", {})
+    threshold_percentiles = sanitize_threshold_percentiles(
+        carbon_cfg.get("relative_level_percentiles", [0.25, 0.50, 0.75])
+    )
     _maybe_bootstrap_bundle(
         "APP_PROCESSED_BUNDLE_URL",
         configured_processed_dir,
@@ -759,6 +850,7 @@ def _build_state() -> Dict[str, Any]:
 
     return {
         "config_path": config_path,
+        "threshold_percentiles": threshold_percentiles,
         "processed_dir": str(processed_dir),
         "persist_dir": str(persist_dir),
         "using_demo_processed": using_demo_processed,
@@ -847,15 +939,15 @@ def ask(req: AskRequest) -> Dict[str, Any]:
     return {
         "question": question,
         "intent": asdict(intent_result),
-        "result": _serialize_result(result, evidence),
+        "result": _serialize_result(result, evidence, threshold_percentiles=state["threshold_percentiles"]),
     }
 
 
 def _parse_pollutants_query(value: Optional[str]) -> List[str]:
     if not value:
-        return ["CO2", "NOx", "SOx", "PM"]
+        return ["CO2e", "NOx", "SOx", "PM"]
     items = [v.strip() for v in str(value).split(",") if v.strip()]
-    return items or ["CO2", "NOx", "SOx", "PM"]
+    return items or ["CO2e", "NOx", "SOx", "PM"]
 
 
 @app.get("/api/v1/carbon/ports/{port_id}/emissions")
@@ -879,7 +971,14 @@ def carbon_port_emissions(
         include_uncertainty=True,
         include_evidence=True,
     )
-    return {"port_id": port_id, "result": _serialize_result(result, EvidenceBundle(lines=[], rows=[], trace={}))}
+    return {
+        "port_id": port_id,
+        "result": _serialize_result(
+            result,
+            EvidenceBundle(lines=[], rows=[], trace={}),
+            threshold_percentiles=state["threshold_percentiles"],
+        ),
+    }
 
 
 @app.get("/api/v1/carbon/vessels/{mmsi}/calls/{call_id}")
@@ -901,7 +1000,15 @@ def carbon_vessel_call(
         include_uncertainty=include_uncertainty,
         include_evidence=include_evidence,
     )
-    return {"mmsi": mmsi, "call_id": call_id, "result": _serialize_result(result, EvidenceBundle(lines=[], rows=[], trace={}))}
+    return {
+        "mmsi": mmsi,
+        "call_id": call_id,
+        "result": _serialize_result(
+            result,
+            EvidenceBundle(lines=[], rows=[], trace={}),
+            threshold_percentiles=state["threshold_percentiles"],
+        ),
+    }
 
 
 @app.post("/api/v1/carbon/estimate")
@@ -909,7 +1016,13 @@ def carbon_estimate(req: CarbonEstimateRequest) -> Dict[str, Any]:
     state = _runtime_state()
     engine: CarbonQueryEngine = state["carbon"]
     result = engine.estimate_with_assumptions(req.model_dump())
-    return {"result": _serialize_result(result, EvidenceBundle(lines=[], rows=[], trace={}))}
+    return {
+        "result": _serialize_result(
+            result,
+            EvidenceBundle(lines=[], rows=[], trace={}),
+            threshold_percentiles=state["threshold_percentiles"],
+        )
+    }
 
 
 @app.get("/api/v1/carbon/evidence/{evidence_id}")

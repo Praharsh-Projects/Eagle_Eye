@@ -19,6 +19,22 @@ except Exception:  # pragma: no cover - optional visualization dependency
     alt = None
 
 from src.forecast.forecast import ForecastEngine, ForecastResult
+from src.carbon.presentation import (
+    build_comparison_bar_table,
+    build_emissions_findings,
+    build_reduction_suggestions,
+    classify_level,
+    compute_emissions_metrics,
+    derive_threshold_bands,
+    emissions_measurement_note,
+    extract_chart_findings,
+    format_kgco2e,
+    format_percent,
+    format_tco2e,
+    sanitize_threshold_percentiles,
+    scale_tco2e,
+    to_emissions_display_table,
+)
 from src.carbon.query import CarbonQueryEngine, CarbonResult
 from src.kpi.query import AnalyticsResult, KPIQueryEngine
 from src.qa.intent import IntentResult, classify_question
@@ -48,7 +64,7 @@ SAMPLE_QUERIES_BY_CATEGORY: Dict[str, List[str]] = {
         "Predict whether LUBECK is likely high congestion on 2026-02-20.",
     ],
     "Carbon & Emissions": [
-        "What are TTW emissions at SEGOT in March 2022 for CO2, NOx, SOx, and PM?",
+        "What are TTW emissions at SEGOT in March 2022 for CO2e, NOx, SOx, and PM?",
         "Show WTW CO2e emissions at LVVNT between 2022-02-01 and 2022-02-28.",
         "Carbon emissions for SEGOT by month in 2022.",
     ],
@@ -976,6 +992,8 @@ def _render_compact_result(
     result: Union[AnalyticsResult, ForecastResult, CarbonResult],
     evidence: EvidenceBundle,
     show_technical: bool,
+    carbon_engine: Optional[CarbonQueryEngine] = None,
+    threshold_percentiles: Tuple[float, float, float] = (0.25, 0.50, 0.75),
 ) -> None:
     def _fallback_evidence_from_result(
         value: Union[AnalyticsResult, ForecastResult, CarbonResult],
@@ -987,14 +1005,18 @@ def _render_compact_result(
             for eid in (value.evidence_ids or [])[:max_items]:
                 lines.append(f"carbon_evidence_id={eid}")
             if value.table is not None and not value.table.empty:
-                head = value.table.head(min(3, max_items))
+                head = value.table.head(min(3, max_items)).copy()
+                metric_col = "wtw_co2e_t" if value.boundary == "WTW" else "ttw_co2e_t"
+                if metric_col not in head.columns:
+                    metric_col = "co2_t" if "co2_t" in head.columns else metric_col
                 for _, row in head.iterrows():
                     tokens = []
-                    for col in head.columns[:4]:
-                        cell = row[col]
-                        if pd.isna(cell):
-                            continue
-                        tokens.append(f"{col}={cell}")
+                    if "date" in head.columns and pd.notna(row.get("date")):
+                        tokens.append(f"date_utc={pd.to_datetime(row.get('date'), errors='coerce', utc=True).strftime('%Y-%m-%d')}")
+                    if metric_col in head.columns and pd.notna(row.get(metric_col)):
+                        tokens.append(f"{metric_col}={format_tco2e(float(row.get(metric_col)))}")
+                    if "port_key" in head.columns and pd.notna(row.get("port_key")):
+                        tokens.append(f"port={row.get('port_key')}")
                     if tokens:
                         lines.append(" | ".join(tokens))
             return lines[:max_items]
@@ -1071,18 +1093,96 @@ def _render_compact_result(
             return line
         return line.split("|", maxsplit=3)[-1].strip()
 
+    carbon_metrics: Dict[str, Optional[float]] = {}
+    carbon_level_label = "n/a"
+    carbon_change_vs_median_pct: Optional[float] = None
+    carbon_change_vs_baseline_pct: Optional[float] = None
+    carbon_ci_width_rel: Optional[float] = None
+    carbon_bands = derive_threshold_bands([])
+    carbon_findings: List[Dict[str, str]] = []
+    carbon_suggestions: List[str] = []
+    carbon_chart_findings: List[Any] = []
+    carbon_note_unit = "tCO2e"
+    carbon_hist_series: pd.Series = pd.Series(dtype=float)
+
+    if isinstance(result, CarbonResult):
+        carbon_metrics = compute_emissions_metrics(result.table, result.boundary)
+        current_total = float(carbon_metrics.get("total_tco2e") or 0.0)
+        scaled_current = scale_tco2e(current_total)
+        carbon_note_unit = scaled_current.unit
+        metric_col = "wtw_co2e_t" if result.boundary == "WTW" else "ttw_co2e_t"
+        if metric_col not in (result.table.columns if result.table is not None else []):
+            metric_col = "co2_t"
+        if carbon_engine is not None and not carbon_engine.daily_port.empty and metric_col in carbon_engine.daily_port.columns:
+            hist = carbon_engine.daily_port.copy()
+            if result.table is not None and "port_key" in result.table.columns and result.table["port_key"].notna().any():
+                ports = sorted(set(result.table["port_key"].dropna().astype(str)))
+                hist = hist[hist["port_key"].astype(str).isin(ports)]
+            carbon_hist_series = pd.to_numeric(hist[metric_col], errors="coerce").dropna()
+        elif result.table is not None and metric_col in result.table.columns:
+            carbon_hist_series = pd.to_numeric(result.table[metric_col], errors="coerce").dropna()
+
+        carbon_bands = derive_threshold_bands(
+            values=carbon_hist_series.tolist(),
+            percentiles=threshold_percentiles,
+        )
+        carbon_level_label = classify_level(current_total, carbon_bands)
+
+        if len(carbon_hist_series) > 0:
+            hist_median = float(carbon_hist_series.median())
+            if hist_median > 0:
+                carbon_change_vs_median_pct = ((current_total - hist_median) / hist_median) * 100.0
+            hist_mean = float(carbon_hist_series.mean())
+            if hist_mean > 0:
+                carbon_change_vs_baseline_pct = ((current_total - hist_mean) / hist_mean) * 100.0
+
+        first_metric = result.uncertainty_interval.get("CO2e") or result.uncertainty_interval.get("CO2")
+        if first_metric:
+            point = float(first_metric.get("point", 0.0))
+            lower = float(first_metric.get("lower", 0.0))
+            upper = float(first_metric.get("upper", 0.0))
+            if point > 0:
+                carbon_ci_width_rel = max(0.0, (upper - lower) / point)
+
+        target_note = next((n for n in result.coverage_notes if n.startswith("Coverage window:")), None)
+        target_ts: Optional[pd.Timestamp] = None
+        if target_note and " to " in target_note:
+            try:
+                target_ts = pd.to_datetime(target_note.split(" to ")[-1], errors="coerce", utc=True)
+            except Exception:
+                target_ts = None
+
+        carbon_chart_findings = extract_chart_findings(
+            chart_df=result.chart if result.chart is not None else pd.DataFrame(),
+            target_ts=target_ts,
+            max_findings=5,
+        )
+        carbon_findings = build_emissions_findings(
+            current_tco2e=current_total,
+            level=carbon_level_label,
+            change_vs_median_pct=carbon_change_vs_median_pct,
+            source_label=result.source_label,
+            ci_width_rel=carbon_ci_width_rel,
+            chart_findings=carbon_chart_findings,
+        )
+        carbon_suggestions = build_reduction_suggestions(
+            level=carbon_level_label,
+            change_vs_median_pct=carbon_change_vs_median_pct,
+            ci_width_rel=carbon_ci_width_rel,
+            source_label=result.source_label,
+        )
+
     def _build_recommendation_triggers(value: Union[AnalyticsResult, ForecastResult, CarbonResult]) -> List[str]:
         triggers: List[str] = []
         if isinstance(value, CarbonResult):
-            co2e = value.uncertainty_interval.get("CO2e") or value.uncertainty_interval.get("CO2")
-            if co2e:
-                triggers.append(
-                    f"Trigger: {value.boundary} {('CO2e' if 'CO2e' in value.uncertainty_interval else 'CO2')} point={co2e.get('point', 0):.2f}."
-                )
-                triggers.append(
-                    f"Trigger: uncertainty interval {co2e.get('lower', 0):.2f}-{co2e.get('upper', 0):.2f}."
-                )
-            triggers.append(f"Trigger: source label = {value.source_label}.")
+            if carbon_metrics.get("total_tco2e") is not None:
+                triggers.append(f"Trigger: total emissions={format_tco2e(float(carbon_metrics['total_tco2e']))}.")
+            triggers.append(f"Trigger: relative level={carbon_level_label} ({carbon_bands.source_label}).")
+            if carbon_change_vs_median_pct is not None:
+                triggers.append(f"Trigger: change vs historical median={format_percent(carbon_change_vs_median_pct)}.")
+            if carbon_ci_width_rel is not None:
+                triggers.append(f"Trigger: uncertainty CI width={format_percent(carbon_ci_width_rel * 100.0)}.")
+            triggers.append(f"Trigger: source label={value.source_label}.")
             return triggers
 
         if isinstance(value, ForecastResult) and value.forecast is not None and not value.forecast.empty:
@@ -1132,7 +1232,10 @@ def _render_compact_result(
         if isinstance(value, CarbonResult):
             steps.append("Applied deterministic AIS + port-call mode segmentation (transit/manoeuvring/berth/anchorage).")
             steps.append(f"Boundary: {value.boundary}; Pollutants: {', '.join(value.pollutants)}.")
-            steps.append(f"Source label: {value.source_label}.")
+            steps.append(f"Computed values: {value.source_label}.")
+            steps.append("Forecast values: not used unless an explicit forecast request is made.")
+            steps.append("Inferred narrative findings: marked as `inferred` when uncertainty/fallback is high.")
+            steps.append("Retrieved evidence: optional supporting rows only, not numeric source-of-truth.")
             steps.append(f"Factor params version: {value.params_version}.")
             steps.append(f"Confidence: {value.confidence_label} ({value.confidence_reason})")
             for note in value.coverage_notes[:6]:
@@ -1179,21 +1282,13 @@ def _render_compact_result(
     def _build_port_actions(value: Union[AnalyticsResult, ForecastResult, CarbonResult]) -> List[str]:
         actions: List[str] = []
         if isinstance(value, CarbonResult):
-            co2e = value.uncertainty_interval.get("CO2e") or value.uncertainty_interval.get("CO2")
-            point = float((co2e or {}).get("point", 0.0))
-            upper = float((co2e or {}).get("upper", point))
-            if point >= 50:
-                actions.append("Prioritize shore-power and berth energy optimization on high-emission windows.")
-                actions.append("Coordinate pilot/tug sequencing to reduce manoeuvring fuel intensity.")
-            elif point >= 15:
-                actions.append("Apply targeted slow-steaming and auxiliary-load controls for inbound traffic.")
-                actions.append("Use emissions view for berth allocation on high-intensity dates.")
-            else:
-                actions.append("Maintain baseline operations; monitor emissions drift against this baseline.")
-            if upper > point * 1.4:
-                actions.append("Uncertainty is wide: refresh with latest AIS coverage before final ops decisions.")
-            actions.append("Audit supporting evidence IDs before publishing inventory outputs externally.")
-            return actions
+            if carbon_suggestions:
+                return carbon_suggestions
+            return [
+                "Use staggered arrival windows to reduce peak waiting and anchorage emissions.",
+                "Use shore-power and idle-engine reduction where berth dwell is long.",
+                "Re-check uncertainty drivers before committing to high-impact interventions.",
+            ]
 
         if isinstance(value, ForecastResult) and value.forecast is not None and not value.forecast.empty:
             pred = float(value.forecast["predicted"].mean())
@@ -1270,26 +1365,110 @@ def _render_compact_result(
                 st.info("No chartable carbon series for this response.")
                 return
             chart_df = value.chart.copy()
+            st.caption(emissions_measurement_note("tCO2e"))
             if isinstance(chart_df.index, pd.DatetimeIndex):
                 plot_df = chart_df.reset_index().rename(columns={chart_df.index.name or "index": "x"})
                 plot_df["x"] = _to_naive_datetime(plot_df["x"]).dt.floor("D")
                 value_col = [c for c in plot_df.columns if c != "x"][0]
+                display_col = value_col.replace("_", " ").upper()
                 if alt is not None:
                     line = (
                         alt.Chart(plot_df.dropna(subset=["x"]))
                         .mark_line(color="#22c55e", point=True)
                         .encode(
-                            x=alt.X("x:T", title="Date"),
-                            y=alt.Y(f"{value_col}:Q", title=value_col),
-                            tooltip=["x:T", alt.Tooltip(f"{value_col}:Q", format=".3f")],
+                            x=alt.X("x:T", title="Date (UTC)"),
+                            y=alt.Y(f"{value_col}:Q", title=f"{display_col} (tCO2e)"),
+                            tooltip=[
+                                alt.Tooltip("x:T", title="Date (UTC)"),
+                                alt.Tooltip(f"{value_col}:Q", title=f"{display_col} (tCO2e)", format=".3f"),
+                            ],
                         )
                         .properties(height=280)
                     )
-                    st.altair_chart(line, use_container_width=True)
+                    if carbon_chart_findings:
+                        ann = pd.DataFrame(
+                            [
+                                {
+                                    "x": pd.Timestamp(item.timestamp).tz_convert(None)
+                                    if pd.Timestamp(item.timestamp).tzinfo
+                                    else pd.Timestamp(item.timestamp),
+                                    "y": float(item.value),
+                                    "finding": item.finding,
+                                }
+                                for item in carbon_chart_findings[:5]
+                            ]
+                        )
+                        points = alt.Chart(ann).mark_point(color="#ef4444", size=120, filled=True).encode(
+                            x="x:T",
+                            y="y:Q",
+                            tooltip=["finding:N", alt.Tooltip("y:Q", title=f"{display_col} (tCO2e)", format=".3f")],
+                        )
+                        labels = (
+                            alt.Chart(ann.head(3))
+                            .mark_text(align="left", dx=8, dy=-8, color="#fca5a5")
+                            .encode(x="x:T", y="y:Q", text="finding:N")
+                        )
+                        st.altair_chart(line + points + labels, use_container_width=True)
+                    else:
+                        st.altair_chart(line, use_container_width=True)
                 else:
                     st.line_chart(chart_df, use_container_width=True)
             else:
-                st.dataframe(chart_df, use_container_width=True, hide_index=True)
+                plot_df = chart_df.reset_index().rename(columns={chart_df.index.name or "index": "bucket"})
+                value_col = [c for c in plot_df.columns if c != "bucket"][0]
+                display_col = value_col.replace("_", " ").upper()
+                if alt is not None:
+                    bar = (
+                        alt.Chart(plot_df)
+                        .mark_bar(color="#22c55e")
+                        .encode(
+                            x=alt.X("bucket:N", title="Bucket"),
+                            y=alt.Y(f"{value_col}:Q", title=f"{display_col} (tCO2e)"),
+                            tooltip=[
+                                alt.Tooltip("bucket:N", title="Bucket"),
+                                alt.Tooltip(f"{value_col}:Q", title=f"{display_col} (tCO2e)", format=".3f"),
+                            ],
+                        )
+                        .properties(height=280)
+                    )
+                    numeric_vals = pd.to_numeric(plot_df[value_col], errors="coerce")
+                    ann_rows: List[Dict[str, Any]] = []
+                    if numeric_vals.notna().any():
+                        max_idx = int(numeric_vals.idxmax())
+                        min_idx = int(numeric_vals.idxmin())
+                        ann_rows.append(
+                            {
+                                "bucket": str(plot_df.loc[max_idx, "bucket"]),
+                                "value": float(numeric_vals.loc[max_idx]),
+                                "finding": "Finding: Highest emissions in this window.",
+                            }
+                        )
+                        if min_idx != max_idx:
+                            ann_rows.append(
+                                {
+                                    "bucket": str(plot_df.loc[min_idx, "bucket"]),
+                                    "value": float(numeric_vals.loc[min_idx]),
+                                    "finding": "Finding: Lowest emissions in this window.",
+                                }
+                            )
+                    if ann_rows:
+                        ann_df = pd.DataFrame(ann_rows).head(3)
+                        points = alt.Chart(ann_df).mark_point(color="#ef4444", size=120, filled=True).encode(
+                            x=alt.X("bucket:N", title="Bucket"),
+                            y="value:Q",
+                            tooltip=["finding:N", alt.Tooltip("value:Q", title=f"{display_col} (tCO2e)", format=".3f")],
+                        )
+                        labels = (
+                            alt.Chart(ann_df)
+                            .mark_text(align="left", dx=8, dy=-8, color="#fca5a5")
+                            .encode(x="bucket:N", y="value:Q", text="finding:N")
+                        )
+                        st.altair_chart(bar + points + labels, use_container_width=True)
+                    else:
+                        st.altair_chart(bar, use_container_width=True)
+                else:
+                    st.dataframe(chart_df, use_container_width=True, hide_index=True)
+            st.caption("Tooltip values and axis are unit-labelled in tCO2e for auditability.")
             return
 
         if isinstance(value, ForecastResult):
@@ -1436,6 +1615,8 @@ def _render_compact_result(
 
     st.subheader("Answer")
     st.write(result.answer)
+    if isinstance(result, CarbonResult):
+        st.caption(emissions_measurement_note("tCO2e"))
     evidence_backed = _build_evidence_backed_answer(result, evidence)
     if evidence_backed:
         st.info(evidence_backed)
@@ -1451,18 +1632,115 @@ def _render_compact_result(
             f"Boundary: `{result.boundary}` | Pollutants: `{', '.join(result.pollutants)}` | "
             f"Params version: `{result.params_version}`"
         )
+        st.caption("Computed values are deterministic inventory outputs; forecast and narrative insights are shown separately.")
+
+        if carbon_metrics:
+            total_val = float(carbon_metrics.get("total_tco2e") or 0.0)
+            intensity_val = carbon_metrics.get("intensity_kg_per_call")
+            day_val = carbon_metrics.get("tco2e_per_day")
+            hour_val = carbon_metrics.get("kgco2e_per_hour")
+
+            c1, c2, c3 = st.columns(3)
+            c4, c5, c6 = st.columns(3)
+            c1.metric("Total emissions", format_tco2e(total_val))
+            c1.caption(emissions_measurement_note(carbon_note_unit))
+
+            c2.metric(
+                "Emissions intensity",
+                f"{format_kgco2e(float(intensity_val))}/vessel-call" if intensity_val is not None else "n/a",
+            )
+            c2.caption(emissions_measurement_note("kgCO2e/vessel-call"))
+
+            c3.metric(
+                "Forecast emissions",
+                "n/a (not requested)",
+            )
+            c3.caption(emissions_measurement_note("tCO2e/forecast-window"))
+
+            c4.metric("Relative level", carbon_level_label)
+            c4.caption(f"Thresholds are {carbon_bands.source_label}.")
+
+            c5.metric(
+                "Change vs baseline",
+                format_percent(carbon_change_vs_baseline_pct) if carbon_change_vs_baseline_pct is not None else "n/a",
+                delta=format_percent(carbon_change_vs_baseline_pct) if carbon_change_vs_baseline_pct is not None else None,
+            )
+            c5.caption("Baseline = historical mean for selected scope.")
+
+            c6.metric(
+                "Change vs historical median",
+                format_percent(carbon_change_vs_median_pct) if carbon_change_vs_median_pct is not None else "n/a",
+                delta=format_percent(carbon_change_vs_median_pct) if carbon_change_vs_median_pct is not None else None,
+            )
+            c6.caption("Median is computed from historical dataset values.")
+
+            st.subheader("Emissions Level (Relative Scale)")
+            st.caption("Low/Moderate/High/Very High classification relative to this dataset percentiles (P25/P50/P75).")
+            if alt is not None:
+                bar_df = build_comparison_bar_table(current_value=total_val, bands=carbon_bands)
+                bar_df["center"] = (bar_df["start"] + bar_df["end"]) / 2.0
+                marker_df = pd.DataFrame([{"x": total_val, "label": f"Current: {format_tco2e(total_val)}"}])
+
+                bars = (
+                    alt.Chart(bar_df)
+                    .mark_bar()
+                    .encode(
+                        x=alt.X("start:Q", title="Emissions (tCO2e)"),
+                        x2="end:Q",
+                        y=alt.Y("level:N", sort=["Very High", "High", "Moderate", "Low"], title=None),
+                        color=alt.Color("level:N", scale=alt.Scale(domain=["Low", "Moderate", "High", "Very High"], range=["#22c55e", "#84cc16", "#f59e0b", "#ef4444"]), legend=None),
+                        tooltip=[
+                            alt.Tooltip("level:N", title="Level"),
+                            alt.Tooltip("start:Q", title="Start (tCO2e)", format=".2f"),
+                            alt.Tooltip("end:Q", title="End (tCO2e)", format=".2f"),
+                        ],
+                    )
+                    .properties(height=180)
+                )
+                marker = alt.Chart(marker_df).mark_rule(color="#f8fafc", strokeWidth=3).encode(x="x:Q")
+                label = (
+                    alt.Chart(marker_df)
+                    .mark_text(align="left", dy=-8, dx=6, color="#f8fafc")
+                    .encode(x="x:Q", y=alt.value(0), text="label:N")
+                )
+                st.altair_chart(bars + marker + label, use_container_width=True)
+                st.caption(
+                    f"Interpretation: current emissions are `{carbon_level_label}` relative to this dataset "
+                    f"(P25={carbon_bands.p25:.2f}, P50={carbon_bands.p50:.2f}, P75={carbon_bands.p75:.2f} tCO2e)."
+                )
+            else:
+                st.info(
+                    f"Relative level: {carbon_level_label} | P25={carbon_bands.p25:.2f}, "
+                    f"P50={carbon_bands.p50:.2f}, P75={carbon_bands.p75:.2f}, current={total_val:.2f} tCO2e"
+                )
+            st.caption("Threshold basis: relative to this dataset (not an external regulatory limit).")
+
+        if result.table is not None and not result.table.empty:
+            st.subheader("Emissions Table")
+            display_table = to_emissions_display_table(result.table)
+            st.dataframe(display_table, width="stretch", hide_index=True)
+            st.caption("All emissions columns are standardized and explicitly unit-labelled.")
+
         if result.uncertainty_interval:
             rows = []
             for key, payload in result.uncertainty_interval.items():
                 rows.append(
                     {
                         "metric": key,
-                        "point": float(payload.get("point", 0.0)),
-                        "lower": float(payload.get("lower", 0.0)),
-                        "upper": float(payload.get("upper", 0.0)),
+                        "point": format_tco2e(float(payload.get("point", 0.0))) if key.upper().startswith("CO2") else f"{float(payload.get('point', 0.0)):.2f} kg",
+                        "lower": format_tco2e(float(payload.get("lower", 0.0))) if key.upper().startswith("CO2") else f"{float(payload.get('lower', 0.0)):.2f} kg",
+                        "upper": format_tco2e(float(payload.get("upper", 0.0))) if key.upper().startswith("CO2") else f"{float(payload.get('upper', 0.0)):.2f} kg",
                     }
                 )
             st.dataframe(pd.DataFrame(rows), width="stretch", hide_index=True)
+            st.caption(emissions_measurement_note("tCO2e"))
+
+        st.subheader("Findings")
+        if carbon_findings:
+            for item in carbon_findings:
+                st.markdown(f"- `{item.get('type', 'deterministic')}` {item.get('text', '')}")
+        else:
+            st.info("No strong deterministic findings were available for this carbon scope.")
 
     if isinstance(result, ForecastResult):
         meaning_note = next((n for n in result.coverage_notes if n.startswith("Meaning:")), None)
@@ -1479,6 +1757,8 @@ def _render_compact_result(
         st.markdown("**Computed evidence used for this answer**")
         for line in computed_lines:
             st.markdown(f"- {line}")
+        if isinstance(result, CarbonResult):
+            st.caption(emissions_measurement_note("tCO2e"))
     if display_lines:
         st.markdown("**Retrieved supporting evidence**")
         for line in display_lines:
@@ -1498,9 +1778,20 @@ def _render_compact_result(
         for idx, step in enumerate(method_steps, start=1):
             st.markdown(f"{idx}. {step}")
 
-    st.subheader("Port Operations Recommendations")
-    for action in _build_port_actions(result):
-        st.markdown(f"- {action}")
+    if isinstance(result, CarbonResult):
+        st.subheader("How To Reduce Emissions")
+        if carbon_suggestions:
+            for action in carbon_suggestions[:5]:
+                st.markdown(f"- {action}")
+        else:
+            st.markdown("- Insufficient strong evidence for targeted actions; maintain baseline operations and monitor.")
+        if result.source_label.lower().startswith("computed with fallback"):
+            st.caption("Suggestions are conservative because this result is estimated with fallback defaults.")
+    else:
+        st.subheader("Port Operations Recommendations")
+        for action in _build_port_actions(result):
+            st.markdown(f"- {action}")
+
     st.markdown("**Recommendation Triggers**")
     for trigger in _build_recommendation_triggers(result):
         st.markdown(f"- {trigger}")
@@ -1619,6 +1910,9 @@ def main() -> None:
         kpi_engine = _init_kpi_engine(str(default_processed_dir))
         forecast_engine = _init_forecast_engine(str(default_processed_dir))
         carbon_cfg = config.get("carbon", {})
+        threshold_percentiles = sanitize_threshold_percentiles(
+            carbon_cfg.get("relative_level_percentiles", [0.25, 0.50, 0.75])
+        )
         carbon_engine = _init_carbon_engine(
             processed_dir=str(default_processed_dir),
             factor_registry_path=str(carbon_cfg.get("factor_registry_path", "config/carbon_factors.v1.json")),
@@ -1767,7 +2061,13 @@ def main() -> None:
         events_path=events_path if events_path.exists() else None,
     )
 
-    _render_compact_result(result=result, evidence=evidence, show_technical=show_technical)
+    _render_compact_result(
+        result=result,
+        evidence=evidence,
+        show_technical=show_technical,
+        carbon_engine=carbon_engine,
+        threshold_percentiles=threshold_percentiles,
+    )
 
 
 if __name__ == "__main__":

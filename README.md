@@ -240,7 +240,7 @@ If dwell is unavailable, congestion falls back to arrivals-only ratio.
 
 Supported well:
 - arrivals volume, busiest day/hour, dwell proxy, congestion proxy, historical-pattern forecasts
-- TTW pollutants (`CO2`, `NOx`, `SOx`, `PM`) and WTW `CO2e` with confidence + uncertainty intervals
+- TTW pollutants (`CO2e`, `NOx`, `SOx`, `PM`) and WTW `CO2e` with confidence + uncertainty intervals
 
 Out of scope (clean refusal):
 - berth crane utilization
@@ -255,10 +255,42 @@ Out of scope (clean refusal):
 - `What will congestion look like next Friday at LUBECK?`
 - `Why was LVVNT congested on 2021-01-01?`
 - `Any unusual spikes in arrivals at GDANSK in 2021-02?`
-- `What are TTW emissions at SEGOT in March 2022 for CO2, NOx, SOx, and PM?`
+- `What are TTW emissions at SEGOT in March 2022 for CO2e, NOx, SOx, and PM?`
 - `Show WTW CO2e emissions at LVVNT between 2022-02-01 and 2022-02-28.`
 
-## 9) Troubleshooting
+## 9) Carbon Measurement and Decision-Support UX
+
+Carbon/emissions outputs are standardized with shared formatting and interpretation helpers:
+- Absolute greenhouse-gas values are shown in `tCO2e` and auto-scale to `ktCO2e` / `MtCO2e` for large totals.
+- Intensity metrics are shown with explicit units such as:
+  - `kgCO2e/vessel-call`
+  - `tCO2e/day`
+  - `kgCO2e/hour`
+- Congestion stays dimensionless and is labelled as `index`.
+- Maritime operational units remain:
+  - distance = `nautical miles (nm)`
+  - speed = `knots (kn)`
+  - time = `UTC` (24-hour)
+
+Carbon result views now include:
+- unit-aware metric cards
+- relative comparison bar (`Low/Moderate/High/Very High`) based on dataset percentiles
+- chart annotations (`Finding: ...`) for highest/lowest/spike/drop/selected period
+- deterministic `Findings` panel
+- `How To Reduce Emissions` panel with 3-5 operational actions tied to the current pattern
+
+Configurable threshold source (single place):
+- `config/config.yaml` -> `carbon.relative_level_percentiles` (default `[0.25, 0.50, 0.75]`)
+
+## 10) Tests
+
+Run unit tests for emissions presentation logic:
+
+```bash
+python -m unittest discover -s tests -p "test_*.py"
+```
+
+## 11) Troubleshooting
 
 - If Chroma fails with Python 3.14, recreate `.venv` with Python 3.12.
 - If RAG evidence is unavailable, ensure `OPENAI_API_KEY` is exported in the same terminal.
@@ -266,7 +298,7 @@ Out of scope (clean refusal):
 - If cloud is still on partial coverage, verify whether the sidebar shows `demo_data/processed`; if so, either upload the processed bundle or set `APP_PROCESSED_BUNDLE_URL`.
 - If Ask has no deterministic output, run `python -m src.kpi.build_kpis ...` first.
 
-## 10) Optional Hosted Deployment Alternatives
+## 12) Optional Hosted Deployment Alternatives
 
 Streamlit Cloud is not a good target for the full local model because the local Chroma store is several GB.
 If you later move beyond the free local deployment, use one of these paths:

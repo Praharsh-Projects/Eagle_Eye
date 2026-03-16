@@ -60,8 +60,9 @@ carbon:
   factor_registry_path: config/carbon_factors.v1.json
   monte_carlo_draws: 500
   default_boundary: TTW
+  relative_level_percentiles: [0.25, 0.50, 0.75]
   default_pollutants:
-    - CO2
+    - CO2e
     - NOx
     - SOx
     - PM
