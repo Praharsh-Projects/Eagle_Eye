@@ -36,3 +36,8 @@ evaluation/thesis/
 # Generated local model artifacts
 models/*
 !models/.gitkeep
+
+# Local tunnel/runtime scratch artifacts
+.eagle_*.log
+.eagle_*.pid
+imported_projects/
