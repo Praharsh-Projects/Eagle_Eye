@@ -2,6 +2,7 @@ services:
   - type: web
     name: eagle-eye-api
     env: docker
+    dockerfilePath: ./Dockerfile.api
     plan: starter
     autoDeploy: true
     disk:

@@ -9,6 +9,43 @@ It now has two layers:
 1. Deterministic analytics/forecast (source of truth for counts, congestion, trends)
 2. Optional RAG evidence (representative examples, not numeric truth)
 
+## 0) Recommended Free Deployment
+
+The recommended **fully free** deployment is:
+- run Eagle Eye on **your own Mac**
+- use the **full local `data/processed` and `data/chroma`**
+- expose the current Streamlit UI through a **free public tunnel**
+
+This is the only realistic way to keep **full parity** with your local model at zero infrastructure cost.
+
+One-command launcher:
+
+```bash
+./run_free_public_app.sh
+```
+
+What it does:
+- checks Docker Desktop is running
+- checks `OPENAI_API_KEY`
+- checks full local assets exist
+- builds the Streamlit Docker image
+- runs the UI container on port `8501`
+- opens a free public tunnel with `cloudflared` (or `ngrok` fallback if installed)
+- prints the public URL
+
+Required local inputs:
+- `data/processed/arrivals_daily.parquet`
+- `data/processed/events.parquet`
+- `data/chroma/chroma.sqlite3`
+- `data/chroma/traffic_metadata_index.csv`
+- `OPENAI_API_KEY` in shell or `.env`
+
+Important:
+- the public URL is temporary
+- it only stays live while your Mac is on
+- Docker Desktop and the tunnel process must keep running
+- this free path does **not** need Streamlit Cloud, remote Chroma, or hosted bundles
+
 ## 1) Mac Setup
 
 ```bash
@@ -23,6 +60,12 @@ Set API key (only needed for RAG index + evidence retrieval):
 
 ```bash
 export OPENAI_API_KEY="YOUR_OPENAI_API_KEY"
+```
+
+Or place it in a local `.env` file:
+
+```bash
+cp .env.example .env
 ```
 
 ## 2) Data Inputs
@@ -158,10 +201,9 @@ python -m src.index.build_index \
 
 Cloud parity summary:
 - Deterministic analytics/forecast parity: bundled in `demo_data/processed`, or bootstrap via `APP_PROCESSED_BUNDLE_URL`
-- Retrieval parity: requires remote Chroma service because local `data/chroma` is too large for Streamlit Cloud
+- Retrieval parity: **not realistic on free Streamlit Cloud** with the full local vector store
 - AIS jump/spoof anomaly parity without retriever: requires `APP_EVENTS_BUNDLE_URL` because those queries need row-level AIS events
-- On non-Streamlit hosts with enough disk, `APP_CHROMA_BUNDLE_URL` can bootstrap a local full vector store and avoid remote Chroma entirely
-- If the full Chroma store is too large for a single archive, use `APP_CHROMA_MANIFEST_URL` to download the store as multiple hosted files
+- On non-Streamlit hosts with enough disk, `APP_CHROMA_BUNDLE_URL` or `APP_CHROMA_MANIFEST_URL` can bootstrap a local full vector store
 
 ## 6) Congestion Definition (used in code)
 
@@ -199,10 +241,13 @@ Out of scope (clean refusal):
 - If cloud is still on partial coverage, verify whether the sidebar shows `demo_data/processed`; if so, either upload the processed bundle or set `APP_PROCESSED_BUNDLE_URL`.
 - If Ask has no deterministic output, run `python -m src.kpi.build_kpis ...` first.
 
-## 10) Full Deployment Alternative (Recommended for Local-Parity Hosting)
+## 10) Optional Hosted Deployment Alternatives
 
 Streamlit Cloud is not a good target for the full local model because the local Chroma store is several GB.
-For full deployment, use the FastAPI service in this repo on a host with disk, such as Render, Railway, Fly.io, or a VPS.
+If you later move beyond the free local deployment, use one of these paths:
+- FastAPI on a host with disk
+- Streamlit on a host with attached storage
+- FastAPI + remote Chroma
 
 ### Run locally
 
@@ -215,16 +260,16 @@ API endpoints:
 - `POST /ask`
 - Swagger docs at `http://localhost:8000/docs`
 
-### Docker run
+### Docker run (API path)
 
 ```bash
-docker build -t eagle-eye .
+docker build -t eagle-eye-api -f Dockerfile.api .
 docker run --rm -p 8000:8000 \
   -e OPENAI_API_KEY="..." \
   -e APP_PROCESSED_BUNDLE_URL="https://.../eagle_eye_processed_bundle.tar.gz" \
   -e APP_EVENTS_BUNDLE_URL="https://.../eagle_eye_events_bundle.tar.gz" \
-  -e APP_CHROMA_BUNDLE_URL="https://.../eagle_eye_chroma_bundle.tar.gz" \
-  eagle-eye
+  -e APP_CHROMA_MANIFEST_URL="https://.../eagle_eye_chroma_manifest.json" \
+  eagle-eye-api
 ```
 
 ### Recommended production modes
@@ -242,7 +287,7 @@ docker run --rm -p 8000:8000 \
   - or `APP_CHROMA_MANIFEST_URL`
 - Do not set `VECTOR_DB_MODE=remote`.
 
-This repo also includes `render.yaml` for a Render web-service deployment with an attached disk.
+This repo also includes `render.yaml` for the optional API deployment path and it now points to `Dockerfile.api`.
 
 ### Example request
 
