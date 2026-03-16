@@ -8,6 +8,7 @@ LOCAL_URL="http://127.0.0.1:8501"
 TUNNEL_LOG="$(mktemp -t eagle-eye-tunnel.XXXX.log)"
 TUNNEL_PID=""
 TUNNEL_URL=""
+PREFERRED_TUNNEL="${PREFERRED_TUNNEL:-cloudflared}"
 
 cleanup() {
   local exit_code=$?
@@ -96,6 +97,34 @@ wait_for_tunnel_url() {
 }
 
 start_tunnel() {
+  if [[ -n "${NGROK_DOMAIN:-}" ]] && command -v ngrok >/dev/null 2>&1; then
+    print_step "5/6" "Starting ngrok tunnel with custom domain"
+    ngrok http 8501 --domain="${NGROK_DOMAIN}" --log=stdout >"${TUNNEL_LOG}" 2>&1 &
+    TUNNEL_PID=$!
+    TUNNEL_URL="https://${NGROK_DOMAIN}"
+    return 0
+  fi
+
+  if [[ "${PREFERRED_TUNNEL}" == "ngrok" ]] && command -v ngrok >/dev/null 2>&1; then
+    print_step "5/6" "Starting free ngrok tunnel"
+    ngrok http 8501 --log=stdout >"${TUNNEL_LOG}" 2>&1 &
+    TUNNEL_PID=$!
+    wait_for_tunnel_url 'https://[-a-zA-Z0-9.]+\.ngrok[-a-zA-Z0-9.]*'
+    return 0
+  fi
+
+  if [[ -n "${CLOUDFLARE_TUNNEL_TOKEN:-}" ]] && command -v cloudflared >/dev/null 2>&1; then
+    print_step "5/6" "Starting Cloudflare named tunnel"
+    cloudflared tunnel run --token "${CLOUDFLARE_TUNNEL_TOKEN}" >"${TUNNEL_LOG}" 2>&1 &
+    TUNNEL_PID=$!
+    if [[ -n "${CLOUDFLARE_TUNNEL_HOSTNAME:-}" ]]; then
+      TUNNEL_URL="https://${CLOUDFLARE_TUNNEL_HOSTNAME}"
+      return 0
+    fi
+    printf 'Error: CLOUDFLARE_TUNNEL_HOSTNAME is required with CLOUDFLARE_TUNNEL_TOKEN for a stable URL.\n' >&2
+    exit 1
+  fi
+
   if command -v cloudflared >/dev/null 2>&1; then
     print_step "5/6" "Starting free Cloudflare tunnel"
     cloudflared tunnel --url "${LOCAL_URL}" >"${TUNNEL_LOG}" 2>&1 &
@@ -142,7 +171,7 @@ if lsof -nP -iTCP:8501 -sTCP:LISTEN >/dev/null 2>&1; then
 fi
 
 print_step "2/6" "Building local Streamlit image"
-docker build -t "${IMAGE_NAME}" -f "${ROOT_DIR}/Dockerfile" "${ROOT_DIR}" >/dev/null
+docker build -t "${IMAGE_NAME}" -f "${ROOT_DIR}/Dockerfile" "${ROOT_DIR}" >/dev/null 2>&1
 
 print_step "3/6" "Starting Streamlit container with full local data"
 docker rm -f "${CONTAINER_NAME}" >/dev/null 2>&1 || true
@@ -155,7 +184,7 @@ docker run -d \
   -v "${ROOT_DIR}/src:/app/src:ro" \
   -v "${ROOT_DIR}/config:/app/config:ro" \
   -v "${ROOT_DIR}/data/processed:/app/data/processed:ro" \
-  -v "${ROOT_DIR}/data/chroma:/app/data/chroma:ro" \
+  -v "${ROOT_DIR}/data/chroma:/app/data/chroma" \
   "${IMAGE_NAME}" >/dev/null
 
 print_step "4/6" "Waiting for Streamlit to become healthy"
@@ -169,6 +198,9 @@ printf 'Processed data: %s\n' "${ROOT_DIR}/data/processed"
 printf 'Vector store: %s\n' "${ROOT_DIR}/data/chroma"
 printf 'Local URL: %s\n' "${LOCAL_URL}"
 printf 'Public URL: %s\n' "${TUNNEL_URL}"
+if [[ "${TUNNEL_URL}" == *"trycloudflare.com"* ]]; then
+  printf 'Note: trycloudflare.com URLs are random per run. Set NGROK_DOMAIN or CLOUDFLARE_TUNNEL_TOKEN+CLOUDFLARE_TUNNEL_HOSTNAME for a stable URL.\n'
+fi
 printf 'Reminder: this stays live only while this Mac, Docker, and the tunnel process remain running.\n'
 printf 'Press Ctrl+C to stop the public app and clean up.\n\n'
 

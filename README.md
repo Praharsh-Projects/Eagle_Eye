@@ -30,7 +30,7 @@ What it does:
 - checks full local assets exist
 - builds the Streamlit Docker image
 - runs the UI container on port `8501`
-- opens a free public tunnel with `cloudflared` (or `ngrok` fallback if installed)
+- opens a free public tunnel (`cloudflared` by default, `ngrok` supported)
 - prints the public URL
 
 Required local inputs:
@@ -45,6 +45,11 @@ Important:
 - it only stays live while your Mac is on
 - Docker Desktop and the tunnel process must keep running
 - this free path does **not** need Streamlit Cloud, remote Chroma, or hosted bundles
+- `data/chroma` is mounted read-write so local retrieval provenance works inside Docker
+
+Optional stable URL modes:
+- `NGROK_DOMAIN=<your-domain.ngrok-free.app> ./run_free_public_app.sh` (requires ngrok auth + reserved domain)
+- `CLOUDFLARE_TUNNEL_TOKEN=... CLOUDFLARE_TUNNEL_HOSTNAME=<host.yourdomain.com> ./run_free_public_app.sh`
 
 ## 1) Mac Setup
 
