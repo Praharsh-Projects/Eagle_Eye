@@ -59,6 +59,71 @@ def _metric_column(pollutant: str, boundary: str) -> str:
     raise ValueError(f"Unsupported pollutant: {pollutant}")
 
 
+_MODE_ALIASES: Dict[str, str] = {
+    "manoeuvring": "manoeuvring",
+    "maneuvering": "manoeuvring",
+    "transit": "transit",
+    "berth": "berth",
+    "anchorage": "anchorage",
+    "hoteling": "berth",
+}
+_DURATION_RE = re.compile(r"\b(\d+(?:\.\d+)?)\s*(?:hours?|hrs?|h)\b", flags=re.IGNORECASE)
+_SPEED_RE = re.compile(r"\b(\d+(?:\.\d+)?)\s*(?:knots?|kn)\b", flags=re.IGNORECASE)
+_FUEL_RE = re.compile(r"\b(mgo|hfo|vlsfo|lng|methanol|ammonia|diesel)\b", flags=re.IGNORECASE)
+_MCR_RE = re.compile(r"\b(\d+(?:\.\d+)?)\s*(?:kw|kW)\b")
+_REF_SPEED_RE = re.compile(r"\bref(?:erence)?\s*speed\s*(\d+(?:\.\d+)?)\s*(?:knots?|kn)\b", flags=re.IGNORECASE)
+
+
+def _extract_estimate_payload(question: str, entities: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    q = (question or "").lower()
+    is_estimate_query = any(token in q for token in ("estimate", "assum", "scenario"))
+    mode = None
+    for token, canonical in _MODE_ALIASES.items():
+        if token in q:
+            mode = canonical
+            break
+
+    dur_hit = _DURATION_RE.search(question or "")
+    speed_hit = _SPEED_RE.search(question or "")
+    has_param_signal = bool(mode or dur_hit or speed_hit)
+    if not (is_estimate_query and has_param_signal):
+        return None
+
+    vessel_type = str(entities.get("vessel_type") or "").strip().lower()
+    if not vessel_type:
+        if "tanker" in q:
+            vessel_type = "tanker"
+        elif "container" in q:
+            vessel_type = "container ship"
+        elif "cargo" in q:
+            vessel_type = "cargo ship"
+        elif "ferry" in q:
+            vessel_type = "ferry"
+        else:
+            vessel_type = "unknown"
+
+    payload: Dict[str, Any] = {
+        "vessel_type": vessel_type,
+        "mode": mode or "transit",
+        "duration_h": float(dur_hit.group(1)) if dur_hit else 1.0,
+        "speed_kn": float(speed_hit.group(1)) if speed_hit else 10.0,
+        "boundary": _norm_boundary(str(entities.get("boundary", "TTW"))),
+        "pollutants": _norm_pollutants(entities.get("pollutants")),
+    }
+
+    fuel_hit = _FUEL_RE.search(question or "")
+    if fuel_hit:
+        payload["fuel_type"] = fuel_hit.group(1).upper()
+    mcr_hit = _MCR_RE.search(question or "")
+    if mcr_hit:
+        payload["mcr_kw"] = float(mcr_hit.group(1))
+    ref_speed_hit = _REF_SPEED_RE.search(question or "")
+    if ref_speed_hit:
+        payload["ref_speed_kn"] = float(ref_speed_hit.group(1))
+
+    return payload
+
+
 def _port_filter(df: pd.DataFrame, port_token: Optional[str]) -> pd.DataFrame:
     if df.empty or not port_token:
         return df
@@ -602,24 +667,30 @@ class CarbonQueryEngine:
             )
 
         seg_scope_all = self._filtered_segments_scope(port_id=port_id, date_from=date_from, date_to=date_to)
-        if seg_scope_all.empty:
+        metric_cols = [_metric_column(pol, boundary) for pol in pollutants_list]
+        metric_primary = metric_cols[0] if metric_cols else ("wtw_co2e_t" if boundary == "WTW" else "ttw_co2e_t")
+        daily_scope = _port_filter(self.daily_port.copy(), port_id)
+        daily_scope = _date_filter(daily_scope, "date", date_from, date_to)
+
+        if seg_scope_all.empty and daily_scope.empty:
             return self._no_data(
                 "No carbon segment rows matched the requested port/date filters.",
                 boundary=boundary,
                 pollutants=pollutants_list,
                 result_state=CARBON_STATE_NOT_COMPUTABLE,
-                diagnostics=self._build_scope_diagnostics(pd.DataFrame(), metric_col="ttw_co2e_t"),
+                diagnostics=self._build_scope_diagnostics(pd.DataFrame(), metric_col=metric_primary),
             )
         if "segment_id" in seg_scope_all.columns:
             seg_scope_all = seg_scope_all.drop_duplicates(subset=["segment_id"], keep="first")
 
         # Deterministic inventory must be call-linked; destination-only proxy segments are not used as numeric truth.
-        deterministic = seg_scope_all[
-            seg_scope_all["call_id"].notna() & (seg_scope_all["call_id"].astype(str) != "")
-        ].copy()
-
-        metric_cols = [_metric_column(pol, boundary) for pol in pollutants_list]
-        metric_primary = metric_cols[0] if metric_cols else ("wtw_co2e_t" if boundary == "WTW" else "ttw_co2e_t")
+        deterministic = (
+            seg_scope_all[
+                seg_scope_all["call_id"].notna() & (seg_scope_all["call_id"].astype(str) != "")
+            ].copy()
+            if not seg_scope_all.empty
+            else pd.DataFrame()
+        )
 
         baseline_scope = _port_filter(self.daily_port.copy(), port_id)
         baseline_values = (
@@ -629,8 +700,6 @@ class CarbonQueryEngine:
         )
         used_proxy_daily = False
         if deterministic.empty:
-            daily_scope = _port_filter(self.daily_port.copy(), port_id)
-            daily_scope = _date_filter(daily_scope, "date", date_from, date_to)
             if daily_scope.empty:
                 diagnostics = self._build_scope_diagnostics(
                     seg_scope_all,
@@ -1104,14 +1173,19 @@ class CarbonQueryEngine:
                 "upper": point * (1.0 + 1.96 * rel),
             }
 
+        point_tco2e = float(wtw_co2e_t if boundary == "WTW" else ttw_co2e_t)
         answer = (
             f"Carbon estimate computed for {mode} mode ({boundary}) using explicit assumptions. "
-            f"Fuel={fuel_t:.3f} t, CO2e={ttw_co2e_t:.3f} tCO2e."
+            f"Fuel={fuel_t:.3f} t, CO2e={point_tco2e:.3f} tCO2e."
         )
         payload_out = {
             "boundary": boundary,
             "pollutants": pollutants,
-            "source_label": "Computed with fallback defaults" if vessel_class == "unknown" else "Computed from AIS + port-call segmentation",
+            "source_label": (
+                "Computed from explicit scenario assumptions (estimated, with fallback vessel defaults)"
+                if vessel_class == "unknown"
+                else "Computed from explicit scenario assumptions (estimated)"
+            ),
             "confidence_label": "medium",
             "confidence_reason": "Scenario estimate with user-specified assumptions and default uncertainty envelope.",
             "uncertainty_interval": uncertainty,
@@ -1208,6 +1282,10 @@ class CarbonQueryEngine:
                 include_uncertainty=True,
                 include_evidence=True,
             )
+
+        estimate_payload = _extract_estimate_payload(question, entities)
+        if estimate_payload is not None:
+            return self.estimate_with_assumptions(estimate_payload)
 
         if any(token in q for token in ("forecast", "predict", "expected", "future", "next", "coming", "will")) and not (
             date_from or date_to

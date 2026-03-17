@@ -346,6 +346,67 @@ class CarbonQueryStateTests(unittest.TestCase):
             self.assertEqual(result.status, "no_data")
             self.assertEqual(result.result_state, CARBON_STATE_FORECAST_ONLY)
 
+    def test_estimate_query_routes_to_assumption_engine(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            segments = pd.DataFrame(
+                [
+                    {
+                        "segment_id": "seg-a",
+                        "mmsi": "111111111",
+                        "call_id": None,
+                        "port_key": "SEGOT",
+                        "port_label": "Gothenburg",
+                        "locode_norm": "SEGOT",
+                        "timestamp_start": pd.Timestamp("2022-03-05T10:00:00Z"),
+                        "timestamp_end": pd.Timestamp("2022-03-05T11:00:00Z"),
+                        "duration_h": 1.0,
+                        "row_count": 1,
+                        "co2_t": 1.0,
+                        "ttw_co2e_t": 1.0,
+                        "wtt_co2e_t": 0.2,
+                        "wtw_co2e_t": 1.2,
+                    }
+                ]
+            )
+            calls = pd.DataFrame(columns=["call_id", "mmsi", "ttw_co2e_t", "wtw_co2e_t"])
+            daily = pd.DataFrame(
+                [
+                    {
+                        "date": pd.Timestamp("2022-03-05T00:00:00Z"),
+                        "port_key": "SEGOT",
+                        "port_label": "Gothenburg",
+                        "locode_norm": "SEGOT",
+                        "ttw_co2e_t": 1.0,
+                        "wtw_co2e_t": 1.2,
+                    }
+                ]
+            )
+            evidence = pd.DataFrame(
+                [
+                    {
+                        "evidence_id": "ev-a",
+                        "segment_id": "seg-a",
+                        "mmsi": "111111111",
+                        "call_id": None,
+                        "port_key": "SEGOT",
+                        "timestamp_start": pd.Timestamp("2022-03-05T10:00:00Z"),
+                        "timestamp_end": pd.Timestamp("2022-03-05T11:00:00Z"),
+                        "row_count": 1,
+                    }
+                ]
+            )
+            _write_minimal_carbon_artifacts(root, segments, calls, daily, evidence)
+            engine = CarbonQueryEngine(processed_dir=root, auto_build=False)
+            result = engine.from_question_entities(
+                question="Estimate carbon emissions for a tanker in manoeuvring mode for 2 hours at 6 knots.",
+                entities={"boundary": "TTW", "pollutants": ["CO2e"], "vessel_type": "tanker"},
+                user_filters={},
+            )
+            self.assertEqual(result.status, "ok")
+            self.assertIn(result.result_state, {CARBON_STATE_COMPUTED, CARBON_STATE_COMPUTED_ZERO})
+            self.assertIsNotNone(result.table)
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -147,6 +147,13 @@ PORT_TOKEN_STOPWORDS = {
     "JUMPS",
     "MOVEMENT",
     "CHANGES",
+    "HOUR",
+    "HOURS",
+    "KNOT",
+    "KNOTS",
+    "MODE",
+    "FOR",
+    "WITH",
 }
 NON_PORT_CODE_TOKENS = {
     "TTW",
@@ -317,7 +324,7 @@ def _extract_ports(question: str) -> List[str]:
 
     # Phrase-based fallback for mixed-case names.
     phrase_hits = re.findall(
-        r"\b(?:at|near|for|to)\s+([A-Za-z][A-Za-z\- ]{2,40})",
+        r"\b(?:at|near|in|to)\s+([A-Za-z][A-Za-z\- ]{2,40})",
         question,
         flags=re.IGNORECASE,
     )
@@ -330,6 +337,27 @@ def _extract_ports(question: str) -> List[str]:
         )[0]
         cleaned = cleaned.strip(" ,.;:")
         if not cleaned:
+            continue
+        cleaned_low = cleaned.lower()
+        if cleaned_low.startswith("a ") and any(
+            token in cleaned_low for token in ("tanker", "cargo", "container", "vessel", "ship")
+        ):
+            continue
+        if any(
+            token in cleaned_low
+            for token in (
+                " mode",
+                "hours",
+                "hour",
+                "knots",
+                "knot",
+                "vessel",
+                "ship",
+                "tanker",
+                "cargo",
+                "container",
+            )
+        ):
             continue
         if cleaned.upper() in PORT_TOKEN_STOPWORDS:
             continue
