@@ -435,20 +435,25 @@ class CarbonQueryEngine:
             work["bucket"] = work["date"]
             group_cols = ["bucket", "port_key", "port_label", "locode_norm"]
 
-        agg_map: Dict[str, str] = {m: "sum" for m in metric_cols}
-        agg_map.update(
-            {
-                "row_count": "sum",
-                "duration_h": "sum",
-                "fallback_usage_ratio": "mean",
-                "ci_width_rel": "mean",
-                "confidence_reason": "first",
-            }
-        )
+        agg_map: Dict[str, str] = {m: "sum" for m in metric_cols if m in work.columns}
+        if "row_count" in work.columns:
+            agg_map["row_count"] = "sum"
+        if "duration_h" in work.columns:
+            agg_map["duration_h"] = "sum"
+        if "fallback_usage_ratio" in work.columns:
+            agg_map["fallback_usage_ratio"] = "mean"
+        if "ci_width_rel" in work.columns:
+            agg_map["ci_width_rel"] = "mean"
+        if "confidence_reason" in work.columns:
+            agg_map["confidence_reason"] = "first"
         if include_uncertainty:
             for m in metric_cols:
-                agg_map[f"{m}_lower"] = "sum"
-                agg_map[f"{m}_upper"] = "sum"
+                low_col = f"{m}_lower"
+                up_col = f"{m}_upper"
+                if low_col in work.columns:
+                    agg_map[low_col] = "sum"
+                if up_col in work.columns:
+                    agg_map[up_col] = "sum"
 
         table = (
             work.groupby(group_cols, dropna=False)
@@ -470,9 +475,11 @@ class CarbonQueryEngine:
 
         labels: List[str] = []
         reasons: List[str] = []
+        ci_series = _numeric_series(table, "ci_width_rel").fillna(1.0)
+        fallback_series = _numeric_series(table, "fallback_usage_ratio").fillna(0.0)
         for ci, fb in zip(
-            pd.to_numeric(table.get("ci_width_rel"), errors="coerce").fillna(1.0),
-            pd.to_numeric(table.get("fallback_usage_ratio"), errors="coerce").fillna(0.0),
+            ci_series,
+            fallback_series,
         ):
             ci_f = float(ci)
             fb_f = float(fb)
@@ -483,7 +490,7 @@ class CarbonQueryEngine:
             else:
                 labels.append("low")
             reasons.append(
-                f"CI width={ci_f:.2f}, fallback_ratio={fb_f:.2f}, aggregated from deterministic call-linked segments."
+                f"CI width={ci_f:.2f}, fallback_ratio={fb_f:.2f}, aggregated from deterministic carbon rows."
             )
         table["confidence_label"] = labels
         table["confidence_reason"] = reasons
