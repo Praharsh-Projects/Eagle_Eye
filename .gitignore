@@ -40,4 +40,5 @@ models/*
 # Local tunnel/runtime scratch artifacts
 .eagle_*.log
 .eagle_*.pid
+.streamlit_local.log
 imported_projects/

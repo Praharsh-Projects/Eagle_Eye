@@ -1,0 +1,101 @@
+{
+  "processed_files": {
+    "arrivals_daily.parquet": 508285,
+    "arrivals_hourly.parquet": 1195501,
+    "carbon_emissions_call.parquet": 44388,
+    "carbon_emissions_daily_port.parquet": 2198956,
+    "carbon_emissions_segment.parquet": 3361547,
+    "carbon_evidence.parquet": 2370756,
+    "carbon_params_version.json": 825,
+    "carbon_segments.parquet": 4269966,
+    "congestion_daily.parquet": 1292523,
+    "destination_aliases.json": 207,
+    "dwell_time.parquet": 2490270,
+    "events.parquet": 169800321,
+    "forecast_backtest.json": 6206,
+    "kpi_capabilities.json": 196,
+    "occupancy_hourly.parquet": 1791468,
+    "port_catalog.parquet": 309618,
+    "training_rows.parquet": 177512342
+  },
+  "row_counts": {
+    "events": 1417791,
+    "arrivals_daily": 103851,
+    "arrivals_hourly": 355688,
+    "dwell_time": 82423,
+    "congestion_daily": 85605,
+    "carbon_segments": 11792,
+    "carbon_emissions_segment": 11792,
+    "carbon_emissions_daily_port": 9117,
+    "carbon_emissions_call": 87,
+    "carbon_evidence": 11792
+  },
+  "carbon_coverage": {
+    "segment_rows": 11792,
+    "call_linked_rows": 429,
+    "call_linked_ratio": 0.036380597014925374,
+    "unique_ports_port_key": 2218,
+    "unique_locode_norm": 2,
+    "daily_port_rows": 9117,
+    "daily_with_locode_nonempty": 105,
+    "daily_with_locode_nonempty_ratio": 0.011516946363935505
+  },
+  "benchmark_summary": {
+    "top_k": 5,
+    "strategies": {
+      "A": {
+        "hit_at_k": 0.5,
+        "queries": 12,
+        "mean_latency_ms": 158.208,
+        "hallucination_rate": 0.0,
+        "index_chunks": 40000,
+        "index_size_mb": 216.351,
+        "embedding_model": "sentence-transformers/all-MiniLM-L6-v2"
+      },
+      "B": {
+        "hit_at_k": 0.4167,
+        "queries": 12,
+        "mean_latency_ms": 33.936,
+        "hallucination_rate": 0.0,
+        "index_chunks": 7727,
+        "index_size_mb": 239.346,
+        "embedding_model": "sentence-transformers/all-MiniLM-L6-v2"
+      },
+      "C": {
+        "hit_at_k": 0.3333,
+        "queries": 12,
+        "mean_latency_ms": 25.004,
+        "hallucination_rate": 0.0,
+        "index_chunks": 4054,
+        "index_size_mb": 256.418,
+        "embedding_model": "sentence-transformers/all-MiniLM-L6-v2"
+      }
+    }
+  },
+  "benchmark_per_query": {
+    "rows": 36,
+    "avg_latency_ms": 72.38272567176156,
+    "hits_total": 15
+  },
+  "sample_queries_counts": {
+    "Traffic Monitoring": 8,
+    "Vessel Investigation": 8,
+    "Forecast Planning": 10,
+    "Carbon & Emissions": 10,
+    "Unsupported Scope": 7
+  },
+  "latest_tests": {
+    "suite": "unittest tests.test_intent_reliability tests.test_carbon_query_states tests.test_carbon_presentation",
+    "status": "pass",
+    "cases": 20
+  },
+  "conference_pdf_audit": {
+    "path": "/Users/praharshchintu/Downloads/Eagle_Eye_Conference (5).pdf",
+    "pages": 19,
+    "issues": [
+      "Placeholder affiliation lines still present in title page.",
+      "Corresponding author placeholder still present.",
+      "Abstract section appears duplicated in exported PDF."
+    ]
+  }
+}

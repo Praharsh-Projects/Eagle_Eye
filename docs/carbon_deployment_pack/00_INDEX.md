@@ -6,14 +6,20 @@ This pack documents carbon logic, evaluation coverage, and deployment operations
 1. `/Users/praharshchintu/Documents/New project/docs/carbon_deployment_pack/01_CARBON_EMISSIONS_FULL_SPEC.md`
 2. `/Users/praharshchintu/Documents/New project/docs/carbon_deployment_pack/02_CARBON_EVALUATION_AND_QA.md`
 3. `/Users/praharshchintu/Documents/New project/docs/carbon_deployment_pack/03_DEPLOYMENT_PLAN_CURRENT_AND_NEXT.md`
+4. `/Users/praharshchintu/Documents/New project/docs/carbon_deployment_pack/04_FULL_PROJECT_STATUS_BENCHMARK_DEPLOYMENT_2026-03-25.md`
+5. `/Users/praharshchintu/Documents/New project/docs/carbon_deployment_pack/04_FULL_PROJECT_STATUS_BENCHMARK_DEPLOYMENT_2026-03-25.docx`
+6. `/Users/praharshchintu/Documents/New project/docs/carbon_deployment_pack/_project_truth_snapshot.json`
+7. `/Users/praharshchintu/Documents/New project/docs/carbon_deployment_pack/05_CHATGPT_ONLINE_REVIEW_PLAYBOOK.md`
+8. `/Users/praharshchintu/Documents/New project/docs/carbon_deployment_pack/Eagle_Eye_Carbon_Deployment_Master_Report_2026-03-25.docx`
+9. `/Users/praharshchintu/Documents/New project/docs/carbon_deployment_pack/06_VALIDATION_CHECKLIST_2026-03-25.md`
 
 ---
 
 ## Recommended reading order
 
 ### Quick briefing (10-15 min)
-1. Read Section 1 + 10 + 11 in `01_CARBON_EMISSIONS_FULL_SPEC.md`
-2. Read Section 7 in `02_CARBON_EVALUATION_AND_QA.md`
+1. Read `04_FULL_PROJECT_STATUS_BENCHMARK_DEPLOYMENT_2026-03-25.md`
+2. Read Section 1 + 10 + 11 in `01_CARBON_EMISSIONS_FULL_SPEC.md`
 3. Read Section 1 + 8 + 9 in `03_DEPLOYMENT_PLAN_CURRENT_AND_NEXT.md`
 
 ### Technical deep dive (30-60 min)
@@ -54,6 +60,7 @@ This pack documents carbon logic, evaluation coverage, and deployment operations
 - `01_CARBON_EMISSIONS_FULL_SPEC.md` Section 10
 - `02_CARBON_EVALUATION_AND_QA.md` Section 7
 - `03_DEPLOYMENT_PLAN_CURRENT_AND_NEXT.md` Sections 2, 7, 8
+- `04_FULL_PROJECT_STATUS_BENCHMARK_DEPLOYMENT_2026-03-25.md` Sections 10, 11
 
 ---
 

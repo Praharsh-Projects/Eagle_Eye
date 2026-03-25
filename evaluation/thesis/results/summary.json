@@ -4,7 +4,7 @@
     "A": {
       "hit_at_k": 0.5,
       "queries": 12,
-      "mean_latency_ms": 92.667,
+      "mean_latency_ms": 158.208,
       "hallucination_rate": 0.0,
       "index_chunks": 40000,
       "index_size_mb": 216.351,
@@ -13,7 +13,7 @@
     "B": {
       "hit_at_k": 0.4167,
       "queries": 12,
-      "mean_latency_ms": 33.055,
+      "mean_latency_ms": 33.936,
       "hallucination_rate": 0.0,
       "index_chunks": 7727,
       "index_size_mb": 239.346,
@@ -22,7 +22,7 @@
     "C": {
       "hit_at_k": 0.3333,
       "queries": 12,
-      "mean_latency_ms": 22.307,
+      "mean_latency_ms": 25.004,
       "hallucination_rate": 0.0,
       "index_chunks": 4054,
       "index_size_mb": 256.418,

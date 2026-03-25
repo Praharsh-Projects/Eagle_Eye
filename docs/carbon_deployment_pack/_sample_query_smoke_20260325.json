@@ -1,0 +1,369 @@
+{
+  "overview": {
+    "summary": {
+      "Traffic Monitoring": {
+        "ok|None": 8
+      },
+      "Vessel Investigation": {
+        "ok|None": 8
+      },
+      "Forecast Planning": {
+        "ok|None": 10
+      },
+      "Carbon & Emissions": {
+        "ok|COMPUTED": 10
+      },
+      "Unsupported Scope": {
+        "unsupported|None": 7
+      }
+    },
+    "total_queries": 43,
+    "exceptions": 0
+  },
+  "results": [
+    {
+      "category": "Traffic Monitoring",
+      "query": "How many vessel arrivals were recorded at SEGOT in March 2022?",
+      "intent": "A",
+      "status": "ok",
+      "result_state": null,
+      "answer": "Matched 538 vessel arrivals across 31 day buckets for SEGOT."
+    },
+    {
+      "category": "Traffic Monitoring",
+      "query": "Which weekday is usually busiest at LVVNT?",
+      "intent": "B",
+      "status": "ok",
+      "result_state": null,
+      "answer": "Busiest weekday is Saturday with 217 arrivals for LVVNT."
+    },
+    {
+      "category": "Traffic Monitoring",
+      "query": "Compare Friday and Monday arrivals at GDANSK in March 2022.",
+      "intent": "B",
+      "status": "ok",
+      "result_state": null,
+      "answer": "Friday is busier in the filtered history. Friday=70 vs Monday=63 arrivals (~1.11x)."
+    },
+    {
+      "category": "Traffic Monitoring",
+      "query": "Show daily arrival counts at LVVNT between 2022-02-01 and 2022-02-28.",
+      "intent": "A",
+      "status": "ok",
+      "result_state": null,
+      "answer": "Matched 75 vessel arrivals across 25 day buckets for LVVNT."
+    },
+    {
+      "category": "Traffic Monitoring",
+      "query": "How many tanker arrivals were recorded at LVVNT between 2022-03-01 and 2022-03-10?",
+      "intent": "A",
+      "status": "ok",
+      "result_state": null,
+      "answer": "Matched 9 vessel arrivals across 7 day buckets for LVVNT."
+    },
+    {
+      "category": "Traffic Monitoring",
+      "query": "What was the peak arrival day at SEGOT in March 2022?",
+      "intent": "A",
+      "status": "ok",
+      "result_state": null,
+      "answer": "Peak arrivals day is 2022-03-29 with 26 vessel arrivals for SEGOT."
+    },
+    {
+      "category": "Traffic Monitoring",
+      "query": "Which port had more arrivals in March 2022: LVVNT or SEGOT?",
+      "intent": "D",
+      "status": "ok",
+      "result_state": null,
+      "answer": "SEGOT ranks highest for arrivals_vessels in this window."
+    },
+    {
+      "category": "Traffic Monitoring",
+      "query": "Show cargo-ship arrivals at GDANSK during 2022-03.",
+      "intent": "A",
+      "status": "ok",
+      "result_state": null,
+      "answer": "Matched 339 vessel arrivals across 31 day buckets for PLGDN."
+    },
+    {
+      "category": "Vessel Investigation",
+      "query": "For MMSI 245286000, how long was the vessel in port on 2021-01-01?",
+      "intent": "A",
+      "status": "ok",
+      "result_state": null,
+      "answer": "MMSI 245286000 had 1 matched port call(s), median dwell 933.3 minutes, total dwell 15.6 hours."
+    },
+    {
+      "category": "Vessel Investigation",
+      "query": "Show suspicious AIS jumps for MMSI 246521000 on 2022-03-10.",
+      "intent": "F",
+      "status": "ok",
+      "result_state": null,
+      "answer": "Detected 3 potential sudden AIS coordinate jumps in the filtered range."
+    },
+    {
+      "category": "Vessel Investigation",
+      "query": "For MMSI 212575000, summarize suspicious AIS jumps on 2021-01-01.",
+      "intent": "F",
+      "status": "ok",
+      "result_state": null,
+      "answer": "No sudden AIS coordinate jumps were detected in the filtered range."
+    },
+    {
+      "category": "Vessel Investigation",
+      "query": "List any AIS jump anomalies for MMSI 266232000 between 2021-01-01 and 2021-01-03.",
+      "intent": "F",
+      "status": "ok",
+      "result_state": null,
+      "answer": "No sudden AIS coordinate jumps were detected in the filtered range."
+    },
+    {
+      "category": "Vessel Investigation",
+      "query": "Show movement anomalies for MMSI 246650000 in March 2022.",
+      "intent": "A",
+      "status": "ok",
+      "result_state": null,
+      "answer": "Matched 10,849 vessel arrivals across 31 day buckets."
+    },
+    {
+      "category": "Vessel Investigation",
+      "query": "How many anomaly events were detected for MMSI 255806245 in 2022-03?",
+      "intent": "F",
+      "status": "ok",
+      "result_state": null,
+      "answer": "Detected 1 potential arrival spike days."
+    },
+    {
+      "category": "Vessel Investigation",
+      "query": "For MMSI 304833000, show port-stay duration evidence during 2022-03.",
+      "intent": "A",
+      "status": "ok",
+      "result_state": null,
+      "answer": "Matched 10,849 vessel arrivals across 31 day buckets."
+    },
+    {
+      "category": "Vessel Investigation",
+      "query": "Investigate whether MMSI 377587000 showed unusual position jumps near SEGVX.",
+      "intent": "F",
+      "status": "ok",
+      "result_state": null,
+      "answer": "No sudden AIS coordinate jumps were detected in the filtered range."
+    },
+    {
+      "category": "Forecast Planning",
+      "query": "What will congestion be at LVVNT on Friday, February 20, 2026?",
+      "intent": "C",
+      "status": "ok",
+      "result_state": null,
+      "answer": "Predicted congestion index at LVVNT on 2026-02-20 is 3.37 (range 2.84 to 3.91). This indicates high pressure versus baseline (1.00). The estimate is anchored to historical matches from the same calend"
+    },
+    {
+      "category": "Forecast Planning",
+      "query": "Predict congestion for SEGOT next Friday based on historical patterns.",
+      "intent": "C",
+      "status": "ok",
+      "result_state": null,
+      "answer": "Predicted congestion index at SEGOT on 2026-03-27 is 2.10 (range 2.05 to 2.14). This indicates high pressure versus baseline (1.00). The estimate is anchored to historical matches from the same calend"
+    },
+    {
+      "category": "Forecast Planning",
+      "query": "Expected congestion at GDANSK on 2026-03-06?",
+      "intent": "C",
+      "status": "ok",
+      "result_state": null,
+      "answer": "Predicted congestion index at PLGDN on 2026-03-06 is 3.81 (range 1.83 to 5.79). This indicates high pressure versus baseline (1.00). The estimate is anchored to historical matches from the same calend"
+    },
+    {
+      "category": "Forecast Planning",
+      "query": "Compare expected congestion next Friday between LVVNT and SEGOT.",
+      "intent": "C",
+      "status": "ok",
+      "result_state": null,
+      "answer": "Predicted congestion comparison for 2026-03-27: LVVNT=1.57 (0.80-2.33) vs SEGOT=2.10 (2.05-2.14). SEGOT is likely higher."
+    },
+    {
+      "category": "Forecast Planning",
+      "query": "Predict whether LUBECK is likely high congestion on 2026-02-20.",
+      "intent": "C",
+      "status": "ok",
+      "result_state": null,
+      "answer": "Predicted congestion index at LUBECK on 2026-02-20 is 2.00 (range 1.60 to 2.40). This indicates high pressure versus baseline (1.00). The estimate is anchored to historical matches from the same calen"
+    },
+    {
+      "category": "Forecast Planning",
+      "query": "Forecast congestion at SEGVX for 2026-02-20 with confidence range.",
+      "intent": "C",
+      "status": "ok",
+      "result_state": null,
+      "answer": "Predicted congestion index at SEGVX on 2026-02-20 is 2.16 (range 2.10 to 2.23). This indicates high pressure versus baseline (1.00). The estimate is anchored to historical matches from the same calend"
+    },
+    {
+      "category": "Forecast Planning",
+      "query": "What is the expected congestion index at LVVNT on 2026-03-13?",
+      "intent": "C",
+      "status": "ok",
+      "result_state": null,
+      "answer": "Predicted congestion index at LVVNT on 2026-03-13 is 2.26 (range 2.25 to 2.26). This indicates high pressure versus baseline (1.00). The estimate is anchored to historical matches from the same calend"
+    },
+    {
+      "category": "Forecast Planning",
+      "query": "Will SEGOT likely remain above baseline congestion next Friday?",
+      "intent": "C",
+      "status": "ok",
+      "result_state": null,
+      "answer": "Predicted congestion index at SEGOT on 2026-03-27 is 2.10 (range 2.05 to 2.14). This indicates high pressure versus baseline (1.00). The estimate is anchored to historical matches from the same calend"
+    },
+    {
+      "category": "Forecast Planning",
+      "query": "Compare forecast congestion on 2026-03-06 for LVVNT, SEGOT, and GDANSK.",
+      "intent": "C",
+      "status": "ok",
+      "result_state": null,
+      "answer": "Predicted congestion comparison for 2026-03-06: LVVNT=2.47 (1.79-3.14) vs SEGOT=2.50 (2.03-2.96). SEGOT is likely higher."
+    },
+    {
+      "category": "Forecast Planning",
+      "query": "Predict if Monday or Friday will be more congested at LVVNT next week.",
+      "intent": "C",
+      "status": "ok",
+      "result_state": null,
+      "answer": "Forecasted congestion index for Monday is 2.88 (interval 0.00 to 14.63) over the next 4 week(s). This indicates high pressure versus baseline (1.00)."
+    },
+    {
+      "category": "Carbon & Emissions",
+      "query": "What are TTW emissions at SEGOT in March 2022 for CO2e, NOx, SOx, and PM?",
+      "intent": "H",
+      "status": "ok",
+      "result_state": "COMPUTED",
+      "answer": "WTW emissions for SEGOT were computed from deterministic AIS-derived daily inventory (proxy-based, no call-link rows in this scope). Total CO2e=86.46 tCO2e (52.80-120.00 tCO2e)."
+    },
+    {
+      "category": "Carbon & Emissions",
+      "query": "Show WTW CO2e emissions at LVVNT between 2022-02-01 and 2022-02-28.",
+      "intent": "H",
+      "status": "ok",
+      "result_state": "COMPUTED",
+      "answer": "WTW emissions for LVVNT were computed from deterministic AIS-derived daily inventory (proxy-based, no call-link rows in this scope). Total CO2e=133.61 tCO2e (87.98-179.16 tCO2e)."
+    },
+    {
+      "category": "Carbon & Emissions",
+      "query": "Carbon emissions for SEGOT by month in 2022.",
+      "intent": "H",
+      "status": "ok",
+      "result_state": "COMPUTED",
+      "answer": "TTW emissions for SEGOT were computed from deterministic AIS-derived daily inventory (proxy-based, no call-link rows in this scope). Total CO2e=9166.65 tCO2e (5857.20-12564.52 tCO2e)."
+    },
+    {
+      "category": "Carbon & Emissions",
+      "query": "Report TTW CO2e and NOx at LVVNT for 2022-03 grouped by day.",
+      "intent": "H",
+      "status": "ok",
+      "result_state": "COMPUTED",
+      "answer": "WTW emissions for LVVNT were computed from deterministic AIS-derived daily inventory (proxy-based, no call-link rows in this scope). Total CO2e=286.33 tCO2e (191.26-383.36 tCO2e)."
+    },
+    {
+      "category": "Carbon & Emissions",
+      "query": "Show WTW CO2e at SEGVX between 2022-03-01 and 2022-03-31.",
+      "intent": "H",
+      "status": "ok",
+      "result_state": "COMPUTED",
+      "answer": "WTW emissions for SEGVX were computed from deterministic AIS-derived daily inventory (proxy-based, no call-link rows in this scope). Total CO2e=71.54 tCO2e (32.42-112.42 tCO2e)."
+    },
+    {
+      "category": "Carbon & Emissions",
+      "query": "What are call-level emissions for MMSI 209468000 and call_id 209468000_2021-01-06T10-17-56_SETRG?",
+      "intent": "H",
+      "status": "ok",
+      "result_state": "COMPUTED",
+      "answer": "TTW emissions for call `209468000_2021-01-06T10-17-56_SETRG` (MMSI 209468000) were computed deterministically with greenhouse-gas values reported as tCO2e."
+    },
+    {
+      "category": "Carbon & Emissions",
+      "query": "Estimate carbon emissions for a tanker in manoeuvring mode for 2 hours at 6 knots.",
+      "intent": "H",
+      "status": "ok",
+      "result_state": "COMPUTED",
+      "answer": "Carbon estimate computed for manoeuvring mode (TTW) using explicit assumptions. Fuel=1.474 t, CO2e=4.588 tCO2e."
+    },
+    {
+      "category": "Carbon & Emissions",
+      "query": "Compare TTW versus WTW CO2e totals at SETRG for March 2022.",
+      "intent": "H",
+      "status": "ok",
+      "result_state": "COMPUTED",
+      "answer": "WTW emissions for SETRG were computed from deterministic call-linked segmentation. Total CO2e=106.29 tCO2e (61.49-151.10 tCO2e)."
+    },
+    {
+      "category": "Carbon & Emissions",
+      "query": "Show monthly WTW CO2e trend for SETRG in 2022.",
+      "intent": "H",
+      "status": "ok",
+      "result_state": "COMPUTED",
+      "answer": "WTW emissions for SETRG were computed from deterministic call-linked segmentation. Total CO2e=723.63 tCO2e (416.03-1031.23 tCO2e)."
+    },
+    {
+      "category": "Carbon & Emissions",
+      "query": "Give carbon evidence IDs used for LVVNT emissions in 2022-02.",
+      "intent": "H",
+      "status": "ok",
+      "result_state": "COMPUTED",
+      "answer": "TTW emissions for LVVNT were computed from deterministic AIS-derived daily inventory (proxy-based, no call-link rows in this scope). Total CO2e=108.81 tCO2e (73.21-146.80 tCO2e)."
+    },
+    {
+      "category": "Unsupported Scope",
+      "query": "What is crane utilization at berth 3 in SEGOT today?",
+      "intent": "G",
+      "status": "unsupported",
+      "result_state": null,
+      "answer": "I don't have evidence in the dataset to answer that."
+    },
+    {
+      "category": "Unsupported Scope",
+      "query": "What is gate queue length at Port of Gdansk right now?",
+      "intent": "G",
+      "status": "unsupported",
+      "result_state": null,
+      "answer": "I don't have evidence in the dataset to answer that."
+    },
+    {
+      "category": "Unsupported Scope",
+      "query": "How many TEU were handled per hour at berth 5 yesterday?",
+      "intent": "G",
+      "status": "unsupported",
+      "result_state": null,
+      "answer": "I don't have evidence in the dataset to answer that."
+    },
+    {
+      "category": "Unsupported Scope",
+      "query": "What is yard occupancy percentage at terminal block C right now?",
+      "intent": "G",
+      "status": "unsupported",
+      "result_state": null,
+      "answer": "I don't have evidence in the dataset to answer that."
+    },
+    {
+      "category": "Unsupported Scope",
+      "query": "Show quay crane productivity at LVVNT in March 2022.",
+      "intent": "G",
+      "status": "unsupported",
+      "result_state": null,
+      "answer": "I don't have evidence in the dataset to answer that."
+    },
+    {
+      "category": "Unsupported Scope",
+      "query": "What is truck turn-time at the gate for SEGOT today?",
+      "intent": "G",
+      "status": "unsupported",
+      "result_state": null,
+      "answer": "I don't have evidence in the dataset to answer that."
+    },
+    {
+      "category": "Unsupported Scope",
+      "query": "Give exact berth-level queue length for vessel arrivals at GDANSK.",
+      "intent": "G",
+      "status": "unsupported",
+      "result_state": null,
+      "answer": "I don't have evidence in the dataset to answer that."
+    }
+  ]
+}
