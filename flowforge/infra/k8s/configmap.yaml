@@ -1,0 +1,12 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: flowforge-config
+  namespace: flowforge
+data:
+  FLOWFORGE_REDIS_URL: redis://redis:6379/0
+  FLOWFORGE_DATABASE_URL: postgresql+psycopg2://flowforge:flowforge@postgres:5432/flowforge
+  FLOWFORGE_MAX_JOB_RETRIES: "3"
+  FLOWFORGE_BASE_BACKOFF_SECONDS: "2"
+  FLOWFORGE_GRPC_HOST: 0.0.0.0
+  FLOWFORGE_GRPC_PORT: "50051"

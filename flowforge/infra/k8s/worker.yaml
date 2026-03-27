@@ -1,0 +1,21 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: flowforge-worker
+  namespace: flowforge
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: flowforge-worker
+  template:
+    metadata:
+      labels:
+        app: flowforge-worker
+    spec:
+      containers:
+        - name: worker
+          image: ghcr.io/your-org/flowforge-worker:latest
+          envFrom:
+            - configMapRef:
+                name: flowforge-config

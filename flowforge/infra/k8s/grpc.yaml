@@ -1,0 +1,36 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: flowforge-grpc
+  namespace: flowforge
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: flowforge-grpc
+  template:
+    metadata:
+      labels:
+        app: flowforge-grpc
+    spec:
+      containers:
+        - name: grpc
+          image: ghcr.io/your-org/flowforge-grpc:latest
+          envFrom:
+            - configMapRef:
+                name: flowforge-config
+          ports:
+            - containerPort: 50051
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: flowforge-grpc
+  namespace: flowforge
+spec:
+  selector:
+    app: flowforge-grpc
+  ports:
+    - port: 50051
+      targetPort: 50051
+  type: ClusterIP

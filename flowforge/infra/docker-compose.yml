@@ -1,0 +1,67 @@
+version: "3.9"
+
+services:
+  postgres:
+    image: postgres:16
+    container_name: flowforge-postgres
+    environment:
+      POSTGRES_USER: flowforge
+      POSTGRES_PASSWORD: flowforge
+      POSTGRES_DB: flowforge
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+
+  redis:
+    image: redis:7
+    container_name: flowforge-redis
+    ports:
+      - "6379:6379"
+
+  api:
+    build:
+      context: ..
+      dockerfile: Dockerfile.api
+    container_name: flowforge-api
+    environment:
+      FLOWFORGE_DATABASE_URL: postgresql+psycopg2://flowforge:flowforge@postgres:5432/flowforge
+      FLOWFORGE_REDIS_URL: redis://redis:6379/0
+    depends_on:
+      - postgres
+      - redis
+    ports:
+      - "8000:8000"
+
+  grpc:
+    build:
+      context: ..
+      dockerfile: Dockerfile.grpc
+    container_name: flowforge-grpc
+    environment:
+      FLOWFORGE_DATABASE_URL: postgresql+psycopg2://flowforge:flowforge@postgres:5432/flowforge
+      FLOWFORGE_REDIS_URL: redis://redis:6379/0
+      FLOWFORGE_GRPC_HOST: 0.0.0.0
+      FLOWFORGE_GRPC_PORT: 50051
+    depends_on:
+      - postgres
+      - redis
+    ports:
+      - "50051:50051"
+
+  worker:
+    build:
+      context: ..
+      dockerfile: Dockerfile.worker
+    container_name: flowforge-worker
+    environment:
+      FLOWFORGE_DATABASE_URL: postgresql+psycopg2://flowforge:flowforge@postgres:5432/flowforge
+      FLOWFORGE_REDIS_URL: redis://redis:6379/0
+      FLOWFORGE_MAX_JOB_RETRIES: 3
+      FLOWFORGE_BASE_BACKOFF_SECONDS: 2
+    depends_on:
+      - postgres
+      - redis
+
+volumes:
+  pgdata:

@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>FlowForge Queue Dashboard</title>
+    <style>
+      :root {
+        --bg: #0f172a;
+        --panel: #111827;
+        --text: #e5e7eb;
+        --accent: #22d3ee;
+        --muted: #9ca3af;
+      }
+      body {
+        margin: 0;
+        padding: 2rem;
+        background: radial-gradient(circle at top, #1f2937, var(--bg));
+        color: var(--text);
+        font-family: "IBM Plex Sans", "Segoe UI", sans-serif;
+      }
+      .card {
+        max-width: 720px;
+        margin: 0 auto;
+        background: var(--panel);
+        border: 1px solid #1f2937;
+        border-radius: 16px;
+        padding: 1.5rem;
+      }
+      h1 {
+        margin-top: 0;
+        letter-spacing: 0.02em;
+      }
+      .grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 0.75rem;
+      }
+      .metric {
+        background: #0b1220;
+        border: 1px solid #1f2937;
+        border-radius: 12px;
+        padding: 0.75rem;
+      }
+      .metric strong {
+        color: var(--accent);
+        display: block;
+        font-size: 1.4rem;
+      }
+      p {
+        color: var(--muted);
+      }
+      code {
+        color: var(--accent);
+      }
+    </style>
+  </head>
+  <body>
+    <section class="card">
+      <h1>FlowForge Dashboard</h1>
+      <p>
+        This static page is a placeholder for queue visualisation. For live data, poll
+        <code>GET /metrics</code> from the REST API and render it here.
+      </p>
+      <div class="grid">
+        <article class="metric"><span>Pending</span><strong>--</strong></article>
+        <article class="metric"><span>Running</span><strong>--</strong></article>
+        <article class="metric"><span>Retrying</span><strong>--</strong></article>
+        <article class="metric"><span>Completed</span><strong>--</strong></article>
+      </div>
+    </section>
+  </body>
+</html>
