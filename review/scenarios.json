@@ -1,0 +1,69 @@
+[
+  {
+    "id": "traffic_descriptive",
+    "category": "traffic_descriptive",
+    "mandatory": true,
+    "query": "How many vessel arrivals were recorded at SEGOT in March 2022?",
+    "filters": {
+      "port": "SEGOT",
+      "date_from": "2022-03-01",
+      "date_to": "2022-03-31"
+    },
+    "expected": {
+      "required_sections": ["Answer", "Evidence", "Chart", "How This Was Computed"],
+      "contains_any": ["arrivals", "Matched", "recorded"]
+    }
+  },
+  {
+    "id": "vessel_investigation",
+    "category": "vessel_investigation",
+    "mandatory": true,
+    "query": "Show suspicious AIS jumps for MMSI 246521000 on 2022-03-10.",
+    "expected": {
+      "required_sections": ["Answer", "Evidence", "How This Was Computed"],
+      "contains_any": ["AIS", "jump", "anomaly", "Detected", "No sudden AIS"]
+    }
+  },
+  {
+    "id": "forecast_query",
+    "category": "forecast",
+    "mandatory": true,
+    "query": "What will congestion be at LVVNT on Friday, February 20, 2026?",
+    "expected": {
+      "required_sections": ["Answer", "Confidence", "Chart", "How This Was Computed"],
+      "contains_any": ["Predicted", "forecast", "congestion"]
+    }
+  },
+  {
+    "id": "carbon_deterministic_estimate",
+    "category": "carbon_deterministic",
+    "mandatory": true,
+    "query": "Estimate carbon emissions for a tanker in manoeuvring mode for 2 hours at 6 knots.",
+    "expected": {
+      "required_sections": ["Answer", "Answer Source", "Carbon Contract", "Confidence"],
+      "result_state_any": ["COMPUTED", "COMPUTED_ZERO"],
+      "contains_any": ["Carbon estimate computed", "tCO2e", "Computed from explicit scenario assumptions"]
+    }
+  },
+  {
+    "id": "carbon_retrieval_or_no_data",
+    "category": "carbon_no_data",
+    "mandatory": true,
+    "query": "What are call-level emissions for MMSI 999999999 and call_id call_id_999999999_1900-01-01T00-00-00_FAKE?",
+    "expected": {
+      "required_sections": ["Answer", "Answer Source", "Carbon Contract", "Evidence", "Confidence"],
+      "result_state_any": ["NOT_COMPUTABLE", "RETRIEVAL_ONLY"],
+      "contains_any": ["No matching call_id", "No deterministic carbon", "Not computable"]
+    }
+  },
+  {
+    "id": "unsupported_scope",
+    "category": "unsupported",
+    "mandatory": true,
+    "query": "What is crane utilization at berth 3 in SEGOT today?",
+    "expected": {
+      "required_sections": ["Answer"],
+      "contains_any": ["terminal operations data", "not in PRJ912/PRJ896", "unsupported"]
+    }
+  }
+]

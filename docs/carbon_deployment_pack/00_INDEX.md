@@ -12,6 +12,7 @@ This pack documents carbon logic, evaluation coverage, and deployment operations
 7. `/Users/praharshchintu/Documents/New project/docs/carbon_deployment_pack/05_CHATGPT_ONLINE_REVIEW_PLAYBOOK.md`
 8. `/Users/praharshchintu/Documents/New project/docs/carbon_deployment_pack/Eagle_Eye_Carbon_Deployment_Master_Report_2026-03-25.docx`
 9. `/Users/praharshchintu/Documents/New project/docs/carbon_deployment_pack/06_VALIDATION_CHECKLIST_2026-03-25.md`
+10. `/Users/praharshchintu/Documents/New project/docs/carbon_deployment_pack/07_CHATGPT_REVIEW_ENTRYPOINT.md`
 
 ---
 
@@ -31,6 +32,7 @@ This pack documents carbon logic, evaluation coverage, and deployment operations
 1. `03_DEPLOYMENT_PLAN_CURRENT_AND_NEXT.md` Section 3 (runbooks)
 2. `03_DEPLOYMENT_PLAN_CURRENT_AND_NEXT.md` Section 5 (troubleshooting)
 3. `02_CARBON_EVALUATION_AND_QA.md` Section 4 (query matrix)
+4. `07_CHATGPT_REVIEW_ENTRYPOINT.md` (stable review artifact URL + parser contract)
 
 ---
 
@@ -55,6 +57,7 @@ This pack documents carbon logic, evaluation coverage, and deployment operations
 
 ### “How do we run and deploy reliably?”
 - `03_DEPLOYMENT_PLAN_CURRENT_AND_NEXT.md` Sections 3, 5, 6
+- `07_CHATGPT_REVIEW_ENTRYPOINT.md` (automation + artifact publishing path)
 
 ### “What is already done vs what is pending?”
 - `01_CARBON_EMISSIONS_FULL_SPEC.md` Section 10
@@ -87,6 +90,10 @@ Go to:
 Go to:
 - `01_CARBON_EMISSIONS_FULL_SPEC.md` Section 8
 - `02_CARBON_EVALUATION_AND_QA.md` Section 2.4
+
+### Symptom: live app is JS-only or tunnel URL is unstable for external reviewers
+Go to:
+- `07_CHATGPT_REVIEW_ENTRYPOINT.md` (use published `review/latest` artifacts)
 
 ---
 

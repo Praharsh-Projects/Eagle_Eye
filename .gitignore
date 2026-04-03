@@ -42,3 +42,8 @@ models/*
 .eagle_*.pid
 .streamlit_local.log
 imported_projects/
+
+# UI review generated artifacts
+review/latest/
+review/runs/
+review/logs/
