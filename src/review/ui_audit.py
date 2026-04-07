@@ -28,6 +28,15 @@ HEADING_LINES = [
     "Emissions Level (Relative Scale)",
 ]
 
+SCENARIO_PAGE_MAP = {
+    "traffic_descriptive": "Traffic Monitoring",
+    "vessel_investigation": "Vessel Investigation",
+    "forecast": "ETA & Delay",
+    "carbon_deterministic": "Carbon & Emissions",
+    "carbon_no_data": "Carbon & Emissions",
+    "unsupported": "Traffic Monitoring",
+}
+
 
 @dataclass
 class CheckResult:
@@ -236,6 +245,23 @@ def _find_question_input(page: Any, timeout_ms: int) -> Any:
     raise UIAuditError("section_missing", "Question input not found")
 
 
+def _select_navigation_page(page: Any, page_name: str, timeout_ms: int) -> bool:
+    sidebar = page.locator("section[data-testid='stSidebar']").first
+    candidates = [
+        sidebar.get_by_text(page_name, exact=True).first,
+        page.get_by_text(page_name, exact=True).first,
+    ]
+    for cand in candidates:
+        try:
+            cand.wait_for(timeout=timeout_ms)
+            cand.click(timeout=timeout_ms)
+            page.wait_for_timeout(700)
+            return True
+        except Exception:
+            continue
+    return False
+
+
 def _find_ask_button(page: Any, timeout_ms: int) -> Any:
     candidates = [
         page.get_by_role("button", name="Ask").first,
@@ -375,7 +401,16 @@ def run_ui_audit(
 
     with sync_playwright() as p:
         browser = p.chromium.launch(headless=headless)
-        page = browser.new_page(viewport={"width": 1720, "height": 1100})
+        extra_headers: Dict[str, str] = {}
+        if ".loca.lt" in base_url:
+            # Bypass localtunnel anti-abuse interstitial for automated review runs.
+            extra_headers["bypass-tunnel-reminder"] = "true"
+        context = browser.new_context(
+            viewport={"width": 1720, "height": 1100},
+            extra_http_headers=extra_headers or None,
+            user_agent="EagleEyeAuditBot/1.0",
+        )
+        page = context.new_page()
 
         for sc in scenarios:
             sc_id = str(sc.get("id", "unknown"))
@@ -396,16 +431,19 @@ def run_ui_audit(
             for attempt in range(1, max(1, max_attempts) + 1):
                 try:
                     page.goto(base_url, wait_until="domcontentloaded", timeout=timeout_ms)
+                    target_page = SCENARIO_PAGE_MAP.get(category, "Traffic Monitoring")
+                    _select_navigation_page(page=page, page_name=target_page, timeout_ms=timeout_ms)
                     main = page.locator("section[data-testid='stMain'], section.main, .block-container").first
                     main.wait_for(timeout=timeout_ms)
 
                     # Explicit render wait policy for Streamlit.
                     page.wait_for_timeout(1200)
                     page_text = main.inner_text(timeout=timeout_ms)
-                    if "Sample Queries" not in page_text or "Ask" not in page_text:
+                    has_sample_anchor = ("Sample Queries" in page_text) or ("Sample Query" in page_text)
+                    if (not has_sample_anchor) or ("Ask" not in page_text):
                         raise UIAuditError(
                             "render_timeout",
-                            "Core UI anchors (Sample Queries/Ask) not visible after render wait",
+                            "Core UI anchors (Sample Query/Sample Queries + Ask) not visible after render wait",
                         )
 
                     question_box = _find_question_input(page=page, timeout_ms=timeout_ms)
@@ -426,7 +464,11 @@ def run_ui_audit(
                             try:
                                 _fill_textbox(page=page, label="Port / LOCODE / name", value=str(filters["port"]), timeout_ms=timeout_ms)
                             except Exception:
-                                _fill_textbox(page=page, label="Port / LOCODE", value=str(filters["port"]), timeout_ms=timeout_ms)
+                                try:
+                                    _fill_textbox(page=page, label="Port / LOCODE", value=str(filters["port"]), timeout_ms=timeout_ms)
+                                except Exception:
+                                    # Filter controls vary across pages; treat as best-effort.
+                                    pass
                         if filters.get("date_from"):
                             try:
                                 _fill_textbox(page=page, label="From date (YYYY-MM-DD)", value=str(filters["date_from"]), timeout_ms=timeout_ms)
@@ -503,6 +545,7 @@ def run_ui_audit(
                 }
             )
 
+        context.close()
         browser.close()
 
     api_checks = _run_api_checks(api_base_url=api_base_url)
