@@ -19,8 +19,10 @@ DEFAULT_DEST_ALIASES: Dict[str, str] = {
     "LTKLJ": "LTKLJ",
     "SE GOT": "SEGOT",
     "SEGOT": "SEGOT",
-    "SE KAR": "SEKAR",
-    "SEKAR": "SEKAR",
+    "SE KAR": "SEKAA",
+    "SE KAA": "SEKAA",
+    "SEKAR": "SEKAA",
+    "SEKAA": "SEKAA",
     "FI HEL": "FIHEL",
     "FIHEL": "FIHEL",
 }

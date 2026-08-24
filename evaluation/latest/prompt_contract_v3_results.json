@@ -1,0 +1,1185 @@
+{
+  "schema_version": "3.0",
+  "case_count": 75,
+  "passed_count": 54,
+  "failed_count": 21,
+  "latency_seconds": {
+    "p50": 0.2575,
+    "p95": 1.3006,
+    "max": 4.54
+  },
+  "results": [
+    {
+      "case_id": "pcv3_001",
+      "prompt": "How many vessel arrivals were recorded at SEGOT in March 2022?",
+      "source_tags": [
+        "catalog:traffic_monitoring",
+        "legacy:traffic_monitoring",
+        "ui:traffic_monitoring"
+      ],
+      "intent": "A",
+      "metric": "arrivals_vessels",
+      "result_state": "COMPUTED",
+      "elapsed_seconds": 0.3741,
+      "answer": "Matched 473 vessel arrivals across 31 day buckets for SEGOT.",
+      "passed": true,
+      "errors": []
+    },
+    {
+      "case_id": "pcv3_002",
+      "prompt": "How many vessel arrivals were recorded at Karlshamn and Karlskrona in March 2022?",
+      "source_tags": [
+        "ui:traffic_monitoring"
+      ],
+      "intent": "A",
+      "metric": "arrivals_vessels",
+      "result_state": "COMPUTED",
+      "elapsed_seconds": 0.5616,
+      "answer": "Combined arrivals across 2 ports = 80 vessel arrivals for the selected window (SEKAN, SEKAA).",
+      "passed": false,
+      "errors": [
+        "required term missing: 'partial coverage'",
+        "partial-coverage answer is not labeled explicitly"
+      ]
+    },
+    {
+      "case_id": "pcv3_003",
+      "prompt": "What is the first arrival seen at Karlshamn on 2022-03-22?",
+      "source_tags": [
+        "ui:traffic_monitoring"
+      ],
+      "intent": "A",
+      "metric": "arrivals_vessels",
+      "result_state": "COMPUTED",
+      "elapsed_seconds": 0.2756,
+      "answer": "First recorded arrival at SEKAN in this window is MMSI 231023000 at 2022-03-22 00:34 UTC.",
+      "passed": true,
+      "errors": []
+    },
+    {
+      "case_id": "pcv3_004",
+      "prompt": "What is the last arrival seen at Karlshamn on 2022-03-22?",
+      "source_tags": [
+        "ui:traffic_monitoring"
+      ],
+      "intent": "A",
+      "metric": "arrivals_vessels",
+      "result_state": "COMPUTED",
+      "elapsed_seconds": 0.239,
+      "answer": "Last recorded arrival at SEKAN in this window is MMSI 305178000 at 2022-03-22 23:29 UTC.",
+      "passed": true,
+      "errors": []
+    },
+    {
+      "case_id": "pcv3_005",
+      "prompt": "Show first departure from Karlshamn in March 2022.",
+      "source_tags": [
+        "ui:traffic_monitoring"
+      ],
+      "intent": "A",
+      "metric": null,
+      "result_state": "COMPUTED",
+      "elapsed_seconds": 0.2441,
+      "answer": "First recorded departure from SEKAN in this window is MMSI 277399000 at 2022-03-01 17:55 UTC.",
+      "passed": false,
+      "errors": [
+        "metric None != 'arrivals_vessels'"
+      ]
+    },
+    {
+      "case_id": "pcv3_006",
+      "prompt": "What is median and p90 route travel time from PLSZZ to PLSWI in 2021-02?",
+      "source_tags": [
+        "ui:traffic_monitoring"
+      ],
+      "intent": "A",
+      "metric": "route_duration_h",
+      "result_state": "COMPUTED",
+      "elapsed_seconds": 0.1228,
+      "answer": "Route travel time for PLSZZ\u2192PLSWI: median=2.76 h, p90=4.35 h over 56 voyage(s).",
+      "passed": false,
+      "errors": [
+        "result state 'COMPUTED' not in ['NOT_COMPUTABLE']"
+      ]
+    },
+    {
+      "case_id": "pcv3_007",
+      "prompt": "Compare arrivals at PLSZZ and PLSWI and route durations from PLSZZ to PLSWI and PLSWI to SEMMA in 2021-02.",
+      "source_tags": [
+        "ui:traffic_monitoring"
+      ],
+      "intent": "D",
+      "metric": "route_duration_h",
+      "result_state": "COMPUTED",
+      "elapsed_seconds": 0.6553,
+      "answer": "Partial coverage. Computed 2 requested port scope(s) and 1 requested route scope(s). Unavailable requested scopes: routes: PLSWI->SEMMA.",
+      "passed": false,
+      "errors": [
+        "entity aggregation 'route_travel_time_summary' != None"
+      ]
+    },
+    {
+      "case_id": "pcv3_008",
+      "prompt": "Which weekday is usually busiest at LVVNT?",
+      "source_tags": [
+        "legacy:traffic_monitoring",
+        "ui:traffic_monitoring"
+      ],
+      "intent": "B",
+      "metric": null,
+      "result_state": "COMPUTED",
+      "elapsed_seconds": 0.2782,
+      "answer": "Busiest weekday is Saturday with 164 arrivals for LVVNT.",
+      "passed": false,
+      "errors": [
+        "metric None != 'arrivals_vessels'"
+      ]
+    },
+    {
+      "case_id": "pcv3_009",
+      "prompt": "Compare Friday and Monday arrivals at GDANSK in March 2022.",
+      "source_tags": [
+        "legacy:traffic_monitoring",
+        "ui:traffic_monitoring"
+      ],
+      "intent": "B",
+      "metric": "arrivals_vessels",
+      "result_state": "COMPUTED",
+      "elapsed_seconds": 0.2802,
+      "answer": "Monday is busier in the filtered history. Friday=44 vs Monday=54 arrivals (~1.23x).",
+      "passed": true,
+      "errors": []
+    },
+    {
+      "case_id": "pcv3_010",
+      "prompt": "Show daily arrival counts at LVVNT between 2022-02-01 and 2022-02-28.",
+      "source_tags": [
+        "catalog:traffic_monitoring",
+        "legacy:traffic_monitoring",
+        "ui:traffic_monitoring"
+      ],
+      "intent": "A",
+      "metric": "arrivals_vessels",
+      "result_state": "COMPUTED",
+      "elapsed_seconds": 0.2759,
+      "answer": "Matched 58 vessel arrivals across 25 day buckets for LVVNT.",
+      "passed": true,
+      "errors": []
+    },
+    {
+      "case_id": "pcv3_011",
+      "prompt": "How many tanker arrivals were recorded at LVVNT between 2022-03-01 and 2022-03-10?",
+      "source_tags": [
+        "catalog:traffic_monitoring",
+        "legacy:traffic_monitoring",
+        "ui:traffic_monitoring"
+      ],
+      "intent": "A",
+      "metric": "arrivals_vessels",
+      "result_state": "COMPUTED",
+      "elapsed_seconds": 0.2763,
+      "answer": "Matched 7 vessel arrivals across 5 day buckets for LVVNT.",
+      "passed": true,
+      "errors": []
+    },
+    {
+      "case_id": "pcv3_012",
+      "prompt": "What was the peak arrival day at SEGOT in March 2022?",
+      "source_tags": [
+        "catalog:traffic_monitoring",
+        "legacy:traffic_monitoring",
+        "ui:traffic_monitoring"
+      ],
+      "intent": "A",
+      "metric": "arrivals_vessels",
+      "result_state": "COMPUTED",
+      "elapsed_seconds": 0.277,
+      "answer": "Peak arrivals day is 2022-03-29 with 21 vessel arrivals for SEGOT.",
+      "passed": true,
+      "errors": []
+    },
+    {
+      "case_id": "pcv3_013",
+      "prompt": "Which port had more arrivals in March 2022: LVVNT or SEGOT?",
+      "source_tags": [
+        "legacy:traffic_monitoring",
+        "ui:traffic_monitoring"
+      ],
+      "intent": "D",
+      "metric": "arrivals_vessels",
+      "result_state": "COMPUTED",
+      "elapsed_seconds": 0.5471,
+      "answer": "SEGOT recorded 473 arrivals versus LVVNT with 75; SEGOT was higher by 398 arrivals.",
+      "passed": true,
+      "errors": []
+    },
+    {
+      "case_id": "pcv3_014",
+      "prompt": "Show cargo-ship arrivals at GDANSK during 2022-03.",
+      "source_tags": [
+        "catalog:traffic_monitoring",
+        "legacy:traffic_monitoring",
+        "ui:traffic_monitoring"
+      ],
+      "intent": "A",
+      "metric": "arrivals_vessels",
+      "result_state": "COMPUTED",
+      "elapsed_seconds": 0.281,
+      "answer": "Matched 237 vessel arrivals across 31 day buckets for PLGDN.",
+      "passed": true,
+      "errors": []
+    },
+    {
+      "case_id": "pcv3_015",
+      "prompt": "For MMSI 245286000, how long was the vessel in port on 2021-01-01?",
+      "source_tags": [
+        "catalog:vessel_investigation",
+        "legacy:vessel_investigation",
+        "ui:vessel_investigation"
+      ],
+      "intent": "A",
+      "metric": "dwell_minutes",
+      "result_state": "COMPUTED",
+      "elapsed_seconds": 0.0159,
+      "answer": "MMSI 245286000 was in port at Ventspils (LVVNT) for 933.3 minutes (15.6 hours), from 2021-01-01 00:38:44 UTC to 2021-01-01 16:12:02 UTC.",
+      "passed": false,
+      "errors": [
+        "metric 'dwell_minutes' != 'arrivals_vessels'"
+      ]
+    },
+    {
+      "case_id": "pcv3_016",
+      "prompt": "Show suspicious AIS jumps for MMSI 246521000 on 2022-03-10.",
+      "source_tags": [
+        "legacy:vessel_investigation",
+        "ui:vessel_investigation"
+      ],
+      "intent": "F",
+      "metric": "ais_jump",
+      "result_state": "COMPUTED",
+      "elapsed_seconds": 2.0704,
+      "answer": "Detected 3 potential sudden AIS coordinate jumps in the filtered range.",
+      "passed": true,
+      "errors": []
+    },
+    {
+      "case_id": "pcv3_017",
+      "prompt": "For MMSI 212575000, summarize suspicious AIS jumps on 2021-01-01.",
+      "source_tags": [
+        "legacy:vessel_investigation",
+        "ui:vessel_investigation"
+      ],
+      "intent": "F",
+      "metric": "ais_jump",
+      "result_state": "COMPUTED",
+      "elapsed_seconds": 1.3006,
+      "answer": "No sudden AIS coordinate jumps were detected in the filtered range.",
+      "passed": true,
+      "errors": []
+    },
+    {
+      "case_id": "pcv3_018",
+      "prompt": "List any AIS jump anomalies for MMSI 266232000 between 2021-01-01 and 2021-01-03.",
+      "source_tags": [
+        "legacy:vessel_investigation",
+        "ui:vessel_investigation"
+      ],
+      "intent": "F",
+      "metric": "ais_jump",
+      "result_state": "COMPUTED",
+      "elapsed_seconds": 1.2541,
+      "answer": "No sudden AIS coordinate jumps were detected in the filtered range.",
+      "passed": true,
+      "errors": []
+    },
+    {
+      "case_id": "pcv3_019",
+      "prompt": "Show movement anomalies for MMSI 246650000 in March 2022.",
+      "source_tags": [
+        "legacy:vessel_investigation",
+        "ui:vessel_investigation"
+      ],
+      "intent": "F",
+      "metric": "ais_jump",
+      "result_state": "COMPUTED",
+      "elapsed_seconds": 1.2241,
+      "answer": "No sudden AIS coordinate jumps were detected in the filtered range.",
+      "passed": true,
+      "errors": []
+    },
+    {
+      "case_id": "pcv3_020",
+      "prompt": "How many anomaly events were detected for MMSI 255806245 in 2022-03?",
+      "source_tags": [
+        "legacy:vessel_investigation",
+        "ui:vessel_investigation"
+      ],
+      "intent": "F",
+      "metric": "ais_jump",
+      "result_state": "COMPUTED",
+      "elapsed_seconds": 1.2159,
+      "answer": "No sudden AIS coordinate jumps were detected in the filtered range.",
+      "passed": true,
+      "errors": []
+    },
+    {
+      "case_id": "pcv3_021",
+      "prompt": "For MMSI 304833000, show port-stay duration evidence during 2022-03.",
+      "source_tags": [
+        "legacy:vessel_investigation",
+        "ui:vessel_investigation"
+      ],
+      "intent": "A",
+      "metric": "dwell_minutes",
+      "result_state": "COMPUTED",
+      "elapsed_seconds": 0.0203,
+      "answer": "MMSI 304833000 had 9 matched port call(s), median dwell 755.3 minutes, total dwell 145.8 hours.",
+      "passed": true,
+      "errors": []
+    },
+    {
+      "case_id": "pcv3_022",
+      "prompt": "Investigate whether MMSI 377587000 showed unusual position jumps near SEGVX.",
+      "source_tags": [
+        "legacy:vessel_investigation",
+        "ui:vessel_investigation"
+      ],
+      "intent": "F",
+      "metric": "ais_jump",
+      "result_state": "COMPUTED",
+      "elapsed_seconds": 1.2436,
+      "answer": "No sudden AIS coordinate jumps were detected in the filtered range.",
+      "passed": true,
+      "errors": []
+    },
+    {
+      "case_id": "pcv3_023",
+      "prompt": "What will congestion be at LVVNT on Friday, February 20, 2026?",
+      "source_tags": [
+        "catalog:eta_delay",
+        "legacy:forecast_planning",
+        "ui:eta_delay"
+      ],
+      "intent": "C",
+      "metric": "congestion_index",
+      "result_state": "NOT_COMPUTABLE",
+      "elapsed_seconds": 0.2575,
+      "answer": "A forecast is unavailable because the configured quality gate was not met.",
+      "passed": false,
+      "errors": [
+        "result state 'NOT_COMPUTABLE' not in ['FORECAST_ONLY']"
+      ]
+    },
+    {
+      "case_id": "pcv3_024",
+      "prompt": "Predict congestion for SEGOT next Friday based on historical patterns.",
+      "source_tags": [
+        "legacy:forecast_planning",
+        "ui:eta_delay"
+      ],
+      "intent": "C",
+      "metric": "congestion_index",
+      "result_state": "NOT_COMPUTABLE",
+      "elapsed_seconds": 0.2341,
+      "answer": "A forecast is unavailable because the configured quality gate was not met.",
+      "passed": false,
+      "errors": [
+        "result state 'NOT_COMPUTABLE' not in ['FORECAST_ONLY']"
+      ]
+    },
+    {
+      "case_id": "pcv3_025",
+      "prompt": "Expected congestion at GDANSK on 2026-03-06?",
+      "source_tags": [
+        "catalog:eta_delay",
+        "legacy:forecast_planning",
+        "ui:eta_delay"
+      ],
+      "intent": "C",
+      "metric": "congestion_index",
+      "result_state": "NOT_COMPUTABLE",
+      "elapsed_seconds": 0.2393,
+      "answer": "A forecast is unavailable because the configured quality gate was not met.",
+      "passed": false,
+      "errors": [
+        "result state 'NOT_COMPUTABLE' not in ['FORECAST_ONLY']"
+      ]
+    },
+    {
+      "case_id": "pcv3_026",
+      "prompt": "Compare expected congestion next Friday between LVVNT and SEGOT.",
+      "source_tags": [
+        "catalog:eta_delay",
+        "legacy:forecast_planning",
+        "ui:eta_delay"
+      ],
+      "intent": "C",
+      "metric": "congestion_index",
+      "result_state": "NOT_COMPUTABLE",
+      "elapsed_seconds": 0.4605,
+      "answer": "Could not compute forecasts for at least two requested ports.",
+      "passed": false,
+      "errors": [
+        "result state 'NOT_COMPUTABLE' not in ['FORECAST_ONLY']"
+      ]
+    },
+    {
+      "case_id": "pcv3_027",
+      "prompt": "Predict whether LUBECK is likely high congestion on 2026-02-20.",
+      "source_tags": [
+        "catalog:eta_delay",
+        "legacy:forecast_planning",
+        "ui:eta_delay"
+      ],
+      "intent": "C",
+      "metric": "congestion_index",
+      "result_state": "NOT_COMPUTABLE",
+      "elapsed_seconds": 0.2768,
+      "answer": "A forecast is unavailable because the configured quality gate was not met.",
+      "passed": false,
+      "errors": [
+        "result state 'NOT_COMPUTABLE' not in ['FORECAST_ONLY']"
+      ]
+    },
+    {
+      "case_id": "pcv3_028",
+      "prompt": "Forecast congestion at SEGVX for 2026-02-20 with confidence range.",
+      "source_tags": [
+        "legacy:forecast_planning",
+        "ui:eta_delay"
+      ],
+      "intent": "C",
+      "metric": "congestion_index",
+      "result_state": "NOT_COMPUTABLE",
+      "elapsed_seconds": 0.233,
+      "answer": "A forecast is unavailable because the configured quality gate was not met.",
+      "passed": false,
+      "errors": [
+        "result state 'NOT_COMPUTABLE' not in ['FORECAST_ONLY']"
+      ]
+    },
+    {
+      "case_id": "pcv3_029",
+      "prompt": "What is the expected congestion index at LVVNT on 2026-03-13?",
+      "source_tags": [
+        "legacy:forecast_planning",
+        "ui:eta_delay"
+      ],
+      "intent": "C",
+      "metric": "congestion_index",
+      "result_state": "NOT_COMPUTABLE",
+      "elapsed_seconds": 0.2329,
+      "answer": "A forecast is unavailable because the configured quality gate was not met.",
+      "passed": false,
+      "errors": [
+        "result state 'NOT_COMPUTABLE' not in ['FORECAST_ONLY']"
+      ]
+    },
+    {
+      "case_id": "pcv3_030",
+      "prompt": "Will SEGOT likely remain above baseline congestion next Friday?",
+      "source_tags": [
+        "catalog:eta_delay",
+        "legacy:forecast_planning",
+        "ui:eta_delay"
+      ],
+      "intent": "C",
+      "metric": "congestion_index",
+      "result_state": "NOT_COMPUTABLE",
+      "elapsed_seconds": 0.2324,
+      "answer": "A forecast is unavailable because the configured quality gate was not met.",
+      "passed": false,
+      "errors": [
+        "result state 'NOT_COMPUTABLE' not in ['FORECAST_ONLY']"
+      ]
+    },
+    {
+      "case_id": "pcv3_031",
+      "prompt": "Compare forecast congestion on 2026-03-06 for LVVNT, SEGOT, and GDANSK.",
+      "source_tags": [
+        "legacy:forecast_planning",
+        "ui:eta_delay"
+      ],
+      "intent": "C",
+      "metric": "congestion_index",
+      "result_state": "NOT_COMPUTABLE",
+      "elapsed_seconds": 0.6946,
+      "answer": "Could not compute forecasts for at least two requested ports.",
+      "passed": false,
+      "errors": [
+        "result state 'NOT_COMPUTABLE' not in ['FORECAST_ONLY']"
+      ]
+    },
+    {
+      "case_id": "pcv3_032",
+      "prompt": "Predict if Monday or Friday will be more congested at LVVNT next week.",
+      "source_tags": [
+        "legacy:forecast_planning",
+        "ui:eta_delay"
+      ],
+      "intent": "C",
+      "metric": "congestion_index",
+      "result_state": "FORECAST_ONLY",
+      "elapsed_seconds": 0.4622,
+      "answer": "Forecasted port pressure at LVVNT: Monday=1.16 (0.00-4.04), Friday=1.05 (0.00-4.47). Monday is likely more congested.",
+      "passed": true,
+      "errors": []
+    },
+    {
+      "case_id": "pcv3_033",
+      "prompt": "What is the port pressure index at SEGOT in March 2022?",
+      "source_tags": [
+        "catalog:port_pressure",
+        "ui:port_pressure"
+      ],
+      "intent": "A",
+      "metric": "congestion_index",
+      "result_state": "COMPUTED",
+      "elapsed_seconds": 0.2636,
+      "answer": "Average port pressure index is 1.08; the highest-pressure day is 2022-03-26 at 1.45.",
+      "passed": true,
+      "errors": []
+    },
+    {
+      "case_id": "pcv3_034",
+      "prompt": "Show port pressure trend at LVVNT between 2022-02-01 and 2022-02-28.",
+      "source_tags": [
+        "catalog:port_pressure",
+        "ui:port_pressure"
+      ],
+      "intent": "A",
+      "metric": "congestion_index",
+      "result_state": "COMPUTED",
+      "elapsed_seconds": 0.2376,
+      "answer": "Average port pressure index is 1.33; the highest-pressure day is 2022-02-15 at 2.90.",
+      "passed": true,
+      "errors": []
+    },
+    {
+      "case_id": "pcv3_035",
+      "prompt": "Compare port pressure between SEGOT and GDANSK in March 2022.",
+      "source_tags": [
+        "catalog:port_pressure",
+        "ui:port_pressure"
+      ],
+      "intent": "D",
+      "metric": "congestion_index",
+      "result_state": "COMPUTED",
+      "elapsed_seconds": 0.4712,
+      "answer": "Average port pressure comparison: PLGDN=1.23, SEGOT=1.08. PLGDN had the highest pressure.",
+      "passed": true,
+      "errors": []
+    },
+    {
+      "case_id": "pcv3_036",
+      "prompt": "Which days had the highest pressure at LVVNT in 2022-03?",
+      "source_tags": [
+        "catalog:port_pressure",
+        "ui:port_pressure"
+      ],
+      "intent": "A",
+      "metric": "congestion_index",
+      "result_state": "COMPUTED",
+      "elapsed_seconds": 0.2387,
+      "answer": "The highest-pressure day at LVVNT was 2022-03-21 with a pressure index of 2.50.",
+      "passed": true,
+      "errors": []
+    },
+    {
+      "case_id": "pcv3_037",
+      "prompt": "Is pressure at SEGVX above baseline on 2022-03-10?",
+      "source_tags": [
+        "catalog:port_pressure",
+        "ui:port_pressure"
+      ],
+      "intent": "A",
+      "metric": "congestion_index",
+      "result_state": "COMPUTED",
+      "elapsed_seconds": 0.2373,
+      "answer": "The port pressure index at SEGVX on 2022-03-10 is 0.99, which is below the 1.00 historical baseline.",
+      "passed": true,
+      "errors": []
+    },
+    {
+      "case_id": "pcv3_038",
+      "prompt": "Show pressure by vessel type at GDANSK for 2022-03.",
+      "source_tags": [
+        "ui:port_pressure"
+      ],
+      "intent": "A",
+      "metric": "congestion_index",
+      "result_state": "COMPUTED",
+      "elapsed_seconds": 0.5584,
+      "answer": "cargo ship shows the highest arrivals-based pressure at PLGDN with an index of 1.23 against its historical daily baseline.",
+      "passed": true,
+      "errors": []
+    },
+    {
+      "case_id": "pcv3_039",
+      "prompt": "Compare Friday versus Monday port pressure at SEGOT.",
+      "source_tags": [
+        "ui:port_pressure"
+      ],
+      "intent": "B",
+      "metric": "congestion_index",
+      "result_state": "COMPUTED",
+      "elapsed_seconds": 0.2341,
+      "answer": "Monday has the higher average port pressure at SEGOT: Friday=1.02 versus Monday=1.04.",
+      "passed": true,
+      "errors": []
+    },
+    {
+      "case_id": "pcv3_040",
+      "prompt": "List top 5 high-pressure days at LVVNT in 2022-03.",
+      "source_tags": [
+        "ui:port_pressure"
+      ],
+      "intent": "A",
+      "metric": "congestion_index",
+      "result_state": "COMPUTED",
+      "elapsed_seconds": 0.2349,
+      "answer": "Top 5 high-pressure days at LVVNT: 2022-03-21 (2.50), 2022-03-14 (2.47), 2022-03-09 (2.30), 2022-03-26 (2.08), 2022-03-25 (1.90).",
+      "passed": true,
+      "errors": []
+    },
+    {
+      "case_id": "pcv3_041",
+      "prompt": "What are TTW emissions at SEGOT in March 2022 for CO2e, NOx, SOx, and PM?",
+      "source_tags": [
+        "catalog:carbon_deterministic",
+        "legacy:carbon_emissions",
+        "ui:carbon_emissions"
+      ],
+      "intent": "H",
+      "metric": "emissions",
+      "result_state": "COMPUTED",
+      "elapsed_seconds": 0.0876,
+      "answer": "TTW emissions for SEGOT were computed from deterministic AIS-derived daily inventory (proxy-based, no call-link rows in this scope). Totals: CO2e=44.02 tCO2e, NOx=902.07 kg, SOx=28.19 kg, PM=22.13 kg. The CO2e uncertainty range is 31.12-57.54 tCO2e. The series contains 2 daily periods; the peak was 39.53 tCO2e on 2022-03-07.",
+      "passed": true,
+      "errors": []
+    },
+    {
+      "case_id": "pcv3_042",
+      "prompt": "Show WTW CO2e emissions at LVVNT between 2022-02-01 and 2022-02-28.",
+      "source_tags": [
+        "catalog:carbon_deterministic",
+        "legacy:carbon_emissions",
+        "ui:carbon_emissions"
+      ],
+      "intent": "H",
+      "metric": "emissions",
+      "result_state": "COMPUTED",
+      "elapsed_seconds": 0.0608,
+      "answer": "WTW emissions for LVVNT were computed from deterministic AIS-derived daily inventory (proxy-based, no call-link rows in this scope). Totals: CO2e=120.57 tCO2e. The CO2e uncertainty range is 78.72-162.04 tCO2e. The series contains 3 daily periods; the peak was 48.37 tCO2e on 2022-02-04.",
+      "passed": true,
+      "errors": []
+    },
+    {
+      "case_id": "pcv3_043",
+      "prompt": "Carbon emissions for SEGOT by month in 2022.",
+      "source_tags": [
+        "legacy:carbon_emissions",
+        "ui:carbon_emissions"
+      ],
+      "intent": "H",
+      "metric": "emissions",
+      "result_state": "COMPUTED",
+      "elapsed_seconds": 0.0573,
+      "answer": "TTW emissions for SEGOT were computed from deterministic AIS-derived daily inventory (proxy-based, no call-link rows in this scope). Totals: CO2e=62.91 tCO2e, NOx=1296.48 kg, SOx=40.32 kg, PM=31.84 kg. The CO2e uncertainty range is 44.58-82.35 tCO2e. The series contains 2 monthly periods; the peak was 44.02 tCO2e in 2022-03.",
+      "passed": true,
+      "errors": []
+    },
+    {
+      "case_id": "pcv3_044",
+      "prompt": "Report TTW CO2e and NOx at LVVNT for 2022-03 grouped by day.",
+      "source_tags": [
+        "catalog:carbon_deterministic",
+        "legacy:carbon_emissions",
+        "ui:carbon_emissions"
+      ],
+      "intent": "H",
+      "metric": "emissions",
+      "result_state": "COMPUTED",
+      "elapsed_seconds": 0.059,
+      "answer": "TTW emissions for LVVNT were computed from deterministic AIS-derived daily inventory (proxy-based, no call-link rows in this scope). Totals: CO2e=167.97 tCO2e, NOx=3330.24 kg. The CO2e uncertainty range is 105.62-227.53 tCO2e. The series contains 5 daily periods; the peak was 46.46 tCO2e on 2022-03-02.",
+      "passed": true,
+      "errors": []
+    },
+    {
+      "case_id": "pcv3_045",
+      "prompt": "Show WTW CO2e at SEGVX between 2022-03-01 and 2022-03-31.",
+      "source_tags": [
+        "legacy:carbon_emissions",
+        "ui:carbon_emissions"
+      ],
+      "intent": "H",
+      "metric": "emissions",
+      "result_state": "COMPUTED",
+      "elapsed_seconds": 0.0568,
+      "answer": "WTW emissions for SEGVX were computed from deterministic AIS-derived daily inventory (proxy-based, no call-link rows in this scope). Totals: CO2e=71.54 tCO2e. The CO2e uncertainty range is 32.42-112.42 tCO2e. The series contains 2 daily periods; the peak was 39.79 tCO2e on 2022-03-03.",
+      "passed": true,
+      "errors": []
+    },
+    {
+      "case_id": "pcv3_046",
+      "prompt": "What are call-level emissions for MMSI 209468000 and call_id 209468000_2021-01-06T10-17-56_SETRG?",
+      "source_tags": [
+        "catalog:carbon_deterministic",
+        "legacy:carbon_emissions",
+        "ui:carbon_emissions"
+      ],
+      "intent": "H",
+      "metric": "emissions",
+      "result_state": "COMPUTED",
+      "elapsed_seconds": 0.0148,
+      "answer": "TTW emissions for call `209468000_2021-01-06T10-17-56_SETRG` (MMSI 209468000) were computed deterministically. Totals: CO2e=31.71 tCO2e, NOx=344.00 kg, SOx=20.19 kg, PM=9.99 kg.",
+      "passed": true,
+      "errors": []
+    },
+    {
+      "case_id": "pcv3_047",
+      "prompt": "Estimate carbon emissions for a tanker in manoeuvring mode for 2 hours at 6 knots.",
+      "source_tags": [
+        "catalog:carbon_retrieval_or_no_data",
+        "legacy:carbon_emissions",
+        "ui:carbon_emissions"
+      ],
+      "intent": "H",
+      "metric": "emissions",
+      "result_state": "COMPUTED",
+      "elapsed_seconds": 0.001,
+      "answer": "Carbon estimate computed for manoeuvring mode (TTW) using explicit assumptions. Fuel=1.474 t, CO2e=4.588 tCO2e.",
+      "passed": true,
+      "errors": []
+    },
+    {
+      "case_id": "pcv3_048",
+      "prompt": "Compare TTW versus WTW CO2e totals at SETRG for March 2022.",
+      "source_tags": [
+        "catalog:carbon_deterministic",
+        "legacy:carbon_emissions",
+        "ui:carbon_emissions"
+      ],
+      "intent": "H",
+      "metric": "emissions",
+      "result_state": "COMPUTED",
+      "elapsed_seconds": 0.1113,
+      "answer": "TTW CO2e totals 87.57 tCO2e, while WTW CO2e totals 106.29 tCO2e. Including upstream fuel-cycle emissions adds 18.73 tCO2e (21.4%).",
+      "passed": true,
+      "errors": []
+    },
+    {
+      "case_id": "pcv3_049",
+      "prompt": "Show monthly WTW CO2e trend for SETRG in 2022.",
+      "source_tags": [
+        "legacy:carbon_emissions",
+        "ui:carbon_emissions"
+      ],
+      "intent": "H",
+      "metric": "emissions",
+      "result_state": "COMPUTED",
+      "elapsed_seconds": 0.0636,
+      "answer": "WTW emissions for SETRG were computed from deterministic call-linked segmentation. Totals: CO2e=346.54 tCO2e. The CO2e uncertainty range is 209.27-483.81 tCO2e. The series contains 4 monthly periods; the peak was 106.29 tCO2e in 2022-03.",
+      "passed": true,
+      "errors": []
+    },
+    {
+      "case_id": "pcv3_050",
+      "prompt": "Give carbon evidence IDs used for LVVNT emissions in 2022-02.",
+      "source_tags": [
+        "legacy:carbon_emissions",
+        "ui:carbon_emissions"
+      ],
+      "intent": "H",
+      "metric": "emissions",
+      "result_state": "COMPUTED",
+      "elapsed_seconds": 0.0605,
+      "answer": "TTW emissions for LVVNT were computed from deterministic AIS-derived daily inventory (proxy-based, no call-link rows in this scope). Totals: CO2e=98.28 tCO2e, NOx=1962.32 kg, SOx=62.68 kg, PM=47.90 kg. The CO2e uncertainty range is 65.70-133.20 tCO2e. The series contains 3 daily periods; the peak was 39.08 tCO2e on 2022-02-04. Evidence IDs: 40f3b6ba4bd7792ae1c851b1, 14568f347a61d952c7cf5034, 15def5a756e32b21131eb86e.",
+      "passed": true,
+      "errors": []
+    },
+    {
+      "case_id": "pcv3_051",
+      "prompt": "What is crane utilization at berth 3 in SEGOT today?",
+      "source_tags": [
+        "catalog:unsupported_scope",
+        "legacy:unsupported_scope",
+        "paper:critical",
+        "ui:unsupported_scope"
+      ],
+      "intent": "G",
+      "metric": "unsupported",
+      "result_state": "UNSUPPORTED",
+      "elapsed_seconds": 0.3605,
+      "answer": "I don't have evidence in the dataset to answer that.",
+      "passed": false,
+      "errors": [
+        "date_from '2026-07-27' != None",
+        "date_to '2026-07-27' != None"
+      ]
+    },
+    {
+      "case_id": "pcv3_052",
+      "prompt": "What is gate queue length at Port of Gdansk right now?",
+      "source_tags": [
+        "catalog:unsupported_scope",
+        "legacy:unsupported_scope",
+        "ui:unsupported_scope"
+      ],
+      "intent": "G",
+      "metric": "unsupported",
+      "result_state": "UNSUPPORTED",
+      "elapsed_seconds": 0.42,
+      "answer": "I don't have evidence in the dataset to answer that.",
+      "passed": false,
+      "errors": [
+        "date_from '2026-07-27' != None",
+        "date_to '2026-07-27' != None"
+      ]
+    },
+    {
+      "case_id": "pcv3_053",
+      "prompt": "How many TEU were handled per hour at berth 5 yesterday?",
+      "source_tags": [
+        "catalog:unsupported_scope",
+        "legacy:unsupported_scope",
+        "ui:unsupported_scope"
+      ],
+      "intent": "G",
+      "metric": "unsupported",
+      "result_state": "UNSUPPORTED",
+      "elapsed_seconds": 0.0128,
+      "answer": "I don't have evidence in the dataset to answer that.",
+      "passed": false,
+      "errors": [
+        "date_from '2026-07-26' != None",
+        "date_to '2026-07-26' != None"
+      ]
+    },
+    {
+      "case_id": "pcv3_054",
+      "prompt": "What is yard occupancy percentage at terminal block C right now?",
+      "source_tags": [
+        "catalog:unsupported_scope",
+        "legacy:unsupported_scope",
+        "ui:unsupported_scope"
+      ],
+      "intent": "G",
+      "metric": "unsupported",
+      "result_state": "UNSUPPORTED",
+      "elapsed_seconds": 0.7719,
+      "answer": "I don't have evidence in the dataset to answer that.",
+      "passed": false,
+      "errors": [
+        "date_from '2026-07-27' != None",
+        "date_to '2026-07-27' != None"
+      ]
+    },
+    {
+      "case_id": "pcv3_055",
+      "prompt": "Show quay crane productivity at LVVNT in March 2022.",
+      "source_tags": [
+        "catalog:unsupported_scope",
+        "legacy:unsupported_scope",
+        "ui:unsupported_scope"
+      ],
+      "intent": "G",
+      "metric": "unsupported",
+      "result_state": "UNSUPPORTED",
+      "elapsed_seconds": 0.0124,
+      "answer": "I don't have evidence in the dataset to answer that.",
+      "passed": true,
+      "errors": []
+    },
+    {
+      "case_id": "pcv3_056",
+      "prompt": "What is truck turn-time at the gate for SEGOT today?",
+      "source_tags": [
+        "legacy:unsupported_scope",
+        "ui:unsupported_scope"
+      ],
+      "intent": "G",
+      "metric": "unsupported",
+      "result_state": "UNSUPPORTED",
+      "elapsed_seconds": 0.0125,
+      "answer": "I don't have evidence in the dataset to answer that.",
+      "passed": false,
+      "errors": [
+        "date_from '2026-07-27' != None",
+        "date_to '2026-07-27' != None"
+      ]
+    },
+    {
+      "case_id": "pcv3_057",
+      "prompt": "Give exact berth-level queue length for vessel arrivals at GDANSK.",
+      "source_tags": [
+        "legacy:unsupported_scope",
+        "ui:unsupported_scope"
+      ],
+      "intent": "G",
+      "metric": "unsupported",
+      "result_state": "UNSUPPORTED",
+      "elapsed_seconds": 0.0176,
+      "answer": "I don't have evidence in the dataset to answer that.",
+      "passed": true,
+      "errors": []
+    },
+    {
+      "case_id": "pcv3_058",
+      "prompt": "Show suspicious AIS jumps for MMSI 212575000 on 2021-01-01.",
+      "source_tags": [
+        "catalog:vessel_investigation"
+      ],
+      "intent": "F",
+      "metric": "ais_jump",
+      "result_state": "COMPUTED",
+      "elapsed_seconds": 1.3835,
+      "answer": "No sudden AIS coordinate jumps were detected in the filtered range.",
+      "passed": true,
+      "errors": []
+    },
+    {
+      "case_id": "pcv3_059",
+      "prompt": "List AIS jump anomalies for MMSI 266232000 between 2021-01-01 and 2021-01-03.",
+      "source_tags": [
+        "catalog:vessel_investigation"
+      ],
+      "intent": "F",
+      "metric": "ais_jump",
+      "result_state": "COMPUTED",
+      "elapsed_seconds": 1.2116,
+      "answer": "No sudden AIS coordinate jumps were detected in the filtered range.",
+      "passed": true,
+      "errors": []
+    },
+    {
+      "case_id": "pcv3_060",
+      "prompt": "Investigate unusual AIS jumps near SEGVX in March 2022.",
+      "source_tags": [
+        "catalog:vessel_investigation"
+      ],
+      "intent": "F",
+      "metric": "ais_jump",
+      "result_state": "COMPUTED",
+      "elapsed_seconds": 4.54,
+      "answer": "Detected 21 potential sudden AIS coordinate jumps in the filtered range.",
+      "passed": true,
+      "errors": []
+    },
+    {
+      "case_id": "pcv3_061",
+      "prompt": "Any suspicious spoofing-like jumps for MMSI 246650000 in March 2022?",
+      "source_tags": [
+        "catalog:vessel_investigation"
+      ],
+      "intent": "F",
+      "metric": "ais_jump",
+      "result_state": "COMPUTED",
+      "elapsed_seconds": 1.2502,
+      "answer": "No sudden AIS coordinate jumps were detected in the filtered range.",
+      "passed": true,
+      "errors": []
+    },
+    {
+      "case_id": "pcv3_062",
+      "prompt": "Resolve voyage for MMSI 245286000 departing 2021-01-01 and arriving 2021-01-02.",
+      "source_tags": [
+        "catalog:voyage_intelligence"
+      ],
+      "intent": "G",
+      "metric": "voyage",
+      "result_state": "UNSUPPORTED",
+      "elapsed_seconds": 0.0007,
+      "answer": "I don't have evidence in the dataset to answer that.",
+      "passed": true,
+      "errors": []
+    },
+    {
+      "case_id": "pcv3_063",
+      "prompt": "Show segment timeline for MMSI 266232000 in 2021-01.",
+      "source_tags": [
+        "catalog:voyage_intelligence"
+      ],
+      "intent": "G",
+      "metric": "voyage",
+      "result_state": "UNSUPPORTED",
+      "elapsed_seconds": 0.0003,
+      "answer": "I don't have evidence in the dataset to answer that.",
+      "passed": true,
+      "errors": []
+    },
+    {
+      "case_id": "pcv3_064",
+      "prompt": "Resolve voyage from SEGOT to LVVNT for MMSI 246694000.",
+      "source_tags": [
+        "catalog:voyage_intelligence"
+      ],
+      "intent": "G",
+      "metric": "voyage",
+      "result_state": "UNSUPPORTED",
+      "elapsed_seconds": 0.0176,
+      "answer": "I don't have evidence in the dataset to answer that.",
+      "passed": true,
+      "errors": []
+    },
+    {
+      "case_id": "pcv3_065",
+      "prompt": "Find voyage evidence for a vessel traveling from Poland to Karlskrona in March 2022.",
+      "source_tags": [
+        "catalog:voyage_intelligence"
+      ],
+      "intent": "G",
+      "metric": "voyage",
+      "result_state": "UNSUPPORTED",
+      "elapsed_seconds": 0.0474,
+      "answer": "I don't have evidence in the dataset to answer that.",
+      "passed": true,
+      "errors": []
+    },
+    {
+      "case_id": "pcv3_066",
+      "prompt": "Resolve voyage for unknown MMSI 999999999.",
+      "source_tags": [
+        "catalog:voyage_intelligence"
+      ],
+      "intent": "G",
+      "metric": "voyage",
+      "result_state": "UNSUPPORTED",
+      "elapsed_seconds": 0.0001,
+      "answer": "I don't have evidence in the dataset to answer that.",
+      "passed": true,
+      "errors": []
+    },
+    {
+      "case_id": "pcv3_067",
+      "prompt": "Show WTW CO2e emissions at UNKNOWNPORT between 2022-02-01 and 2022-02-28.",
+      "source_tags": [
+        "catalog:carbon_retrieval_or_no_data"
+      ],
+      "intent": "H",
+      "metric": "emissions",
+      "result_state": "NOT_COMPUTABLE",
+      "elapsed_seconds": 0.4766,
+      "answer": "I don't have evidence in the dataset to answer that.",
+      "passed": true,
+      "errors": []
+    },
+    {
+      "case_id": "pcv3_068",
+      "prompt": "What are emissions at LVVNT for 2035-01-01 to 2035-01-31?",
+      "source_tags": [
+        "catalog:carbon_retrieval_or_no_data"
+      ],
+      "intent": "H",
+      "metric": "emissions",
+      "result_state": "NOT_COMPUTABLE",
+      "elapsed_seconds": 0.3393,
+      "answer": "No carbon segment rows matched the requested port/date filters.",
+      "passed": true,
+      "errors": []
+    },
+    {
+      "case_id": "pcv3_069",
+      "prompt": "Give carbon evidence IDs for port with no deterministic rows.",
+      "source_tags": [
+        "catalog:carbon_retrieval_or_no_data"
+      ],
+      "intent": "H",
+      "metric": "emissions",
+      "result_state": "NOT_COMPUTABLE",
+      "elapsed_seconds": 0.0001,
+      "answer": "The request explicitly targets a scope with no deterministic carbon rows.",
+      "passed": true,
+      "errors": []
+    },
+    {
+      "case_id": "pcv3_070",
+      "prompt": "Predict carbon emissions next Friday at SEGOT.",
+      "source_tags": [
+        "catalog:carbon_retrieval_or_no_data"
+      ],
+      "intent": "H",
+      "metric": "emissions",
+      "result_state": "FORECAST_ONLY",
+      "elapsed_seconds": 0.0124,
+      "answer": "Carbon forecast was requested, but deterministic carbon forecast outputs are not available in this runtime.",
+      "passed": true,
+      "errors": []
+    },
+    {
+      "case_id": "pcv3_071",
+      "prompt": "How many vessel arrivals were recorded at Gothenburg in March 2022?",
+      "source_tags": [
+        "paper:critical"
+      ],
+      "intent": "A",
+      "metric": "arrivals_vessels",
+      "result_state": "COMPUTED",
+      "elapsed_seconds": 0.2829,
+      "answer": "Matched 473 vessel arrivals across 31 day buckets for SEGOT.",
+      "passed": true,
+      "errors": []
+    },
+    {
+      "case_id": "pcv3_072",
+      "prompt": "Total vessel arrivals at Gothenburg in March 2022?",
+      "source_tags": [
+        "paper:critical"
+      ],
+      "intent": "G",
+      "metric": "arrivals_vessels",
+      "result_state": "UNSUPPORTED",
+      "elapsed_seconds": 0.0172,
+      "answer": "I don't have evidence in the dataset to answer that.",
+      "passed": false,
+      "errors": [
+        "intent 'G' not in ['A']",
+        "result state 'UNSUPPORTED' not in ['COMPUTED']",
+        "required value arrivals_vessels=473 was not present",
+        "required value day_buckets=31 was not present"
+      ]
+    },
+    {
+      "case_id": "pcv3_073",
+      "prompt": "How many vessel arrivals were recorded at Karlshamn and Gothenburg in March 2022?",
+      "source_tags": [
+        "paper:critical"
+      ],
+      "intent": "A",
+      "metric": "arrivals_vessels",
+      "result_state": "COMPUTED",
+      "elapsed_seconds": 0.5787,
+      "answer": "Combined arrivals across 2 ports = 548 vessel arrivals for the selected window (SEGOT, SEKAN).",
+      "passed": true,
+      "errors": []
+    },
+    {
+      "case_id": "pcv3_074",
+      "prompt": "According to port-call records, show daily arrival counts at LVVNT between 2022-02-01 and 2022-02-28.",
+      "source_tags": [
+        "paper:critical"
+      ],
+      "intent": "A",
+      "metric": "arrivals_vessels",
+      "result_state": "COMPUTED",
+      "elapsed_seconds": 0.2881,
+      "answer": "Matched 58 vessel arrivals across 25 day buckets for LVVNT.",
+      "passed": true,
+      "errors": []
+    },
+    {
+      "case_id": "pcv3_075",
+      "prompt": "According to port-call records, how many tanker arrivals were recorded at LVVNT between 2022-03-01 and 2022-03-10?",
+      "source_tags": [
+        "paper:critical"
+      ],
+      "intent": "A",
+      "metric": "arrivals_vessels",
+      "result_state": "COMPUTED",
+      "elapsed_seconds": 0.2804,
+      "answer": "Matched 7 vessel arrivals across 5 day buckets for LVVNT.",
+      "passed": true,
+      "errors": []
+    }
+  ]
+}

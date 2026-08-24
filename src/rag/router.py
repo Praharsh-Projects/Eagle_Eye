@@ -63,6 +63,14 @@ class RAGRouter:
         return "both"
 
     def retrieve(self, question: str, filters: QueryFilters, top_k: int | None = None) -> RetrievalResult:
+        requested_top_k = self.retriever.top_k if top_k is None else max(0, int(top_k))
+        if requested_top_k == 0:
+            return RetrievalResult(
+                mode=self.route(question),
+                evidence=[],
+                where_filter=None,
+                backend=self.retriever.retrieval_backend,
+            )
         mode = self.route(question)
         if mode == "traffic":
             return self.retriever.query_traffic(question, filters, top_k=top_k)
@@ -75,4 +83,10 @@ class RAGRouter:
             [*traffic.evidence, *docs.evidence],
             key=lambda x: x.distance if x.distance is not None else 10.0,
         )
-        return RetrievalResult(mode="both", evidence=merged[: (top_k or self.retriever.top_k)], where_filter=traffic.where_filter)
+        backends = sorted({traffic.backend, docs.backend} - {"unknown"})
+        return RetrievalResult(
+            mode="both",
+            evidence=merged[:requested_top_k],
+            where_filter=traffic.where_filter,
+            backend="+".join(backends) or self.retriever.retrieval_backend,
+        )

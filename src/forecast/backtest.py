@@ -51,6 +51,8 @@ def backtest_metric(
     for port in port_rank:
         if metric == "congestion_index":
             port_df = engine.kpi._filter_port(engine.kpi.congestion, port)
+            if "pressure_kind" in port_df.columns and (port_df["pressure_kind"] == "full").any():
+                port_df = port_df[port_df["pressure_kind"] == "full"]
         else:
             port_df = engine.kpi._filter_port(engine.kpi.arrivals_daily, port)
 
@@ -68,22 +70,41 @@ def backtest_metric(
         test = series.iloc[-test_days:]
         history = train.tolist()
         preds: List[float] = []
+        lowers: List[float] = []
+        uppers: List[float] = []
+        naive_preds: List[float] = []
 
         for actual in test.tolist():
-            pred = engine._one_step_prediction(history)
+            pred, lower, upper = engine._one_step_interval(history)
             preds.append(pred)
+            lowers.append(lower)
+            uppers.append(upper)
+            naive_preds.append(float(history[-7] if len(history) >= 7 else history[-1]))
             history.append(float(actual))
 
         y_true = np.array(test.tolist(), dtype=float)
         y_pred = np.array(preds, dtype=float)
         mae = float(np.mean(np.abs(y_true - y_pred)))
         mape = _mape(y_true, y_pred)
+        naive_mae = float(np.mean(np.abs(y_true - np.array(naive_preds, dtype=float))))
+        mase = float(mae / naive_mae) if naive_mae > 0 else float("inf")
+        interval_coverage = float(
+            np.mean(
+                (y_true >= np.array(lowers, dtype=float))
+                & (y_true <= np.array(uppers, dtype=float))
+            )
+        )
+        gate_passed = bool(mase < 1.0 and 0.70 <= interval_coverage <= 0.90)
 
         rows.append(
             {
                 "port_key": port,
                 "mae": mae,
                 "mape": mape,
+                "seasonal_naive_mae": naive_mae,
+                "mase": mase,
+                "interval_80_coverage": interval_coverage,
+                "gate_passed": gate_passed,
                 "test_points": int(len(test)),
             }
         )
@@ -96,13 +117,21 @@ def backtest_metric(
         }
 
     df = pd.DataFrame(rows).sort_values("mae")
+    finite_mase = pd.to_numeric(df["mase"], errors="coerce").replace([np.inf, -np.inf], np.nan)
+    mase_mean = float(finite_mase.mean()) if finite_mase.notna().any() else None
+    per_port = df.replace([np.inf, -np.inf], np.nan).astype(object)
+    per_port = per_port.where(pd.notna(per_port), None)
     return {
         "metric": metric,
         "skipped": False,
         "ports_evaluated": int(len(df)),
         "mae_mean": float(df["mae"].mean()),
         "mape_mean": float(df["mape"].mean()),
-        "per_port": df.to_dict(orient="records"),
+        "seasonal_naive_mae_mean": float(df["seasonal_naive_mae"].mean()),
+        "mase_mean": mase_mean,
+        "interval_80_coverage_mean": float(df["interval_80_coverage"].mean()),
+        "ports_passing_gate": int(df["gate_passed"].sum()),
+        "per_port": per_port.to_dict(orient="records"),
     }
 
 
@@ -135,6 +164,12 @@ def run_backtest(
             "min_history_days": min_history_days,
             "test_days": test_days,
             "max_ports": max_ports,
+            "quality_gate": {
+                "mase_lt": 1.0,
+                "interval_80_coverage_min": 0.70,
+                "interval_80_coverage_max": 0.90,
+                "maximum_horizon_days": 56,
+            },
         },
         "arrivals": arrivals_metrics,
         "congestion": congestion_metrics,

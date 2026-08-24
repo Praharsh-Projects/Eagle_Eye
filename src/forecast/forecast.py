@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Dict, List, Optional
@@ -21,11 +22,22 @@ class ForecastResult:
     coverage_notes: List[str]
     caveats: List[str]
 
+    @property
+    def table(self) -> Optional[pd.DataFrame]:
+        """Compatibility surface for generic result renderers."""
+        return self.forecast
+
+    @property
+    def chart(self) -> Optional[pd.DataFrame]:
+        """Compatibility surface for generic chart renderers."""
+        return self.forecast
+
 
 class ForecastEngine:
     def __init__(self, processed_dir: str | Path = "data/processed") -> None:
         self.processed_dir = Path(processed_dir)
         self.kpi = KPIQueryEngine(processed_dir=self.processed_dir)
+        self._backtest: Optional[Dict[str, object]] = None
 
     @staticmethod
     def _prepare_series(df: pd.DataFrame, date_col: str, value_col: str) -> pd.Series:
@@ -75,8 +87,9 @@ class ForecastEngine:
         for step in range(1, horizon_days + 1):
             pred = cls._one_step_prediction(history)
             sigma = residual_std * np.sqrt(step)
-            lower = max(0.0, pred - 1.96 * sigma)
-            upper = pred + 1.96 * sigma
+            # Central 80% interval (z ~= 1.28155), matching the release gate.
+            lower = max(0.0, pred - 1.2815515655446004 * sigma)
+            upper = pred + 1.2815515655446004 * sigma
             ts = last_date + pd.Timedelta(days=step)
             rows.append(
                 {
@@ -89,6 +102,73 @@ class ForecastEngine:
             history.append(pred)
 
         return pd.DataFrame(rows)
+
+    @classmethod
+    def _one_step_interval(cls, history: List[float]) -> tuple[float, float, float]:
+        pred = cls._one_step_prediction(history)
+        residuals = [
+            float(history[idx] - cls._one_step_prediction(history[:idx]))
+            for idx in range(1, len(history))
+        ]
+        if len(residuals) >= 3:
+            sigma = float(np.std(residuals, ddof=1))
+        elif len(history) > 1:
+            sigma = float(np.std(history, ddof=1))
+        else:
+            sigma = max(float(history[0]) if history else 1.0, 1.0) * 0.15
+        half_width = 1.2815515655446004 * sigma
+        return pred, max(0.0, pred - half_width), pred + half_width
+
+    def _load_backtest(self) -> Dict[str, object]:
+        if self._backtest is not None:
+            return self._backtest
+        path = self.processed_dir / "forecast_backtest.json"
+        if not path.exists():
+            self._backtest = {}
+            return self._backtest
+        try:
+            payload = json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            payload = {}
+        self._backtest = payload if isinstance(payload, dict) else {}
+        return self._backtest
+
+    def _quality_gate(self, metric_group: str, port: str) -> tuple[bool, str]:
+        payload = self._load_backtest()
+        section = payload.get(metric_group, {}) if isinstance(payload, dict) else {}
+        rows = section.get("per_port", []) if isinstance(section, dict) else []
+        resolved = self.kpi.resolve_port_token(port) or str(port).strip()
+        matched = next(
+            (
+                row
+                for row in rows
+                if isinstance(row, dict) and str(row.get("port_key", "")).upper() == str(resolved).upper()
+            ),
+            None,
+        )
+        if matched is None:
+            return False, f"No rolling-origin validation result is available for {resolved}."
+        mase = pd.to_numeric(matched.get("mase"), errors="coerce")
+        coverage = pd.to_numeric(matched.get("interval_80_coverage"), errors="coerce")
+        passed = bool(pd.notna(mase) and pd.notna(coverage) and float(mase) < 1.0 and 0.70 <= float(coverage) <= 0.90)
+        reason = (
+            f"Rolling-origin validation for {resolved}: MASE={float(mase):.3f}, "
+            f"80% interval coverage={float(coverage):.3f}; required MASE<1 and coverage 0.70-0.90."
+            if pd.notna(mase) and pd.notna(coverage)
+            else f"Rolling-origin validation metrics are incomplete for {resolved}."
+        )
+        return passed, reason
+
+    @staticmethod
+    def _unavailable(reason: str, history: Optional[pd.DataFrame] = None) -> ForecastResult:
+        return ForecastResult(
+            status="no_data",
+            answer="A forecast is unavailable because the configured quality gate was not met.",
+            history=history,
+            forecast=None,
+            coverage_notes=[],
+            caveats=[reason],
+        )
 
     @staticmethod
     def _confidence_label(sample_count: int, tier: int) -> str:
@@ -250,13 +330,21 @@ class ForecastEngine:
                 caveats=["Need at least 14 daily points for forecast stability."],
             )
 
+        if int(horizon_weeks) > 8:
+            return self._unavailable("Forecast horizon exceeds the maximum validated window of eight weeks.")
+        _gate_passed, gate_reason = self._quality_gate("arrivals", port)
+
         horizon_days = int(max(1, horizon_weeks) * 7)
         forecast_df = self._forecast_with_intervals(series, horizon_days=horizon_days)
         history_df = series.reset_index().rename(columns={"index": "date", "arrivals_vessels": "actual"})
         history_df.columns = ["date", "actual"]
 
         mean_pred = float(forecast_df["predicted"].mean())
-        answer = f"Forecast mean arrivals are {mean_pred:.2f} vessels/day over the next {horizon_weeks} week(s)."
+        last_date = pd.Timestamp(series.index.max()).strftime("%Y-%m-%d")
+        answer = (
+            f"Historical-data forecast anchored after {last_date}: mean arrivals are {mean_pred:.2f} "
+            f"vessels/day over the following {horizon_weeks} week(s)."
+        )
         notes = self.kpi.coverage_notes(work, "date")
         notes.append(f"Forecast horizon: {horizon_weeks} week(s)")
 
@@ -266,7 +354,89 @@ class ForecastEngine:
             history=history_df,
             forecast=forecast_df,
             coverage_notes=notes,
-            caveats=["Forecast uses weekly-seasonal baseline + 7-day moving average, with residual-based intervals."],
+            caveats=[
+                "Forecast uses a weekly-seasonal baseline plus 7-day moving average with an empirical 80% interval.",
+                gate_reason,
+            ],
+        )
+
+    def forecast_arrivals_for_date(
+        self,
+        port: str,
+        target_date: str,
+        horizon_weeks: int = 4,
+    ) -> ForecastResult:
+        target_ts = pd.to_datetime(target_date, errors="coerce", utc=True)
+        if pd.isna(target_ts):
+            return self._unavailable("Target date is invalid. Use YYYY-MM-DD.")
+        target_ts = pd.Timestamp(target_ts).floor("D")
+
+        work = self.kpi._filter_port(self.kpi.arrivals_daily, port)
+        if work.empty:
+            return self._unavailable("No arrival history found for this port filter.")
+        series = self._prepare_series(work, "date", "arrivals_vessels")
+        if len(series) < 14:
+            return self._unavailable("Need at least 14 historical daily points for a forecast.")
+
+        history_df = series.reset_index().rename(columns={"index": "date", "arrivals_vessels": "actual"})
+        history_df.columns = ["date", "actual"]
+        last_date = pd.Timestamp(series.index.max()).floor("D")
+
+        if target_ts <= last_date and target_ts in series.index:
+            actual = float(series.loc[target_ts])
+            observed = pd.DataFrame(
+                [{"date": target_ts, "predicted": actual, "lower": actual, "upper": actual}]
+            )
+            return ForecastResult(
+                status="ok",
+                answer=(
+                    f"Observed arrivals at {port or 'the selected port'} on {target_ts.strftime('%Y-%m-%d')} "
+                    f"were {actual:.0f} vessels; this is historical evidence, not a forecast."
+                ),
+                history=history_df,
+                forecast=observed,
+                coverage_notes=self.kpi.coverage_notes(work, "date"),
+                caveats=["Target date is inside historical coverage; the observed value takes precedence."],
+            )
+        if target_ts <= last_date:
+            return self._unavailable(
+                "The target is inside historical coverage, but that date has no observed arrival value.",
+                history=history_df,
+            )
+
+        days_ahead = int((target_ts - last_date).days)
+        if days_ahead > 56:
+            return self._unavailable(
+                f"Target date is {days_ahead} days after the latest observation; maximum validated horizon is 56 days.",
+                history=history_df,
+            )
+        if int(horizon_weeks) > 8:
+            return self._unavailable(
+                "Forecast horizon exceeds the maximum validated window of eight weeks.",
+                history=history_df,
+            )
+        _gate_passed, gate_reason = self._quality_gate("arrivals", port)
+
+        forecast_df = self._forecast_with_intervals(series, horizon_days=days_ahead)
+        target_row = forecast_df.iloc[-1]
+        predicted = float(target_row["predicted"])
+        lower = float(target_row["lower"])
+        upper = float(target_row["upper"])
+        return ForecastResult(
+            status="ok",
+            answer=(
+                f"Historical-data forecast for {port or 'the selected port'} on {target_ts.strftime('%Y-%m-%d')}, "
+                f"anchored to the latest observation on {last_date.strftime('%Y-%m-%d')}: "
+                f"{predicted:.2f} arrivals (80% interval {lower:.2f} to {upper:.2f})."
+            ),
+            history=history_df,
+            forecast=forecast_df,
+            coverage_notes=self.kpi.coverage_notes(work, "date")
+            + [f"Target date: {target_ts.strftime('%Y-%m-%d')}", f"Forecast horizon: {days_ahead} day(s)"],
+            caveats=[
+                "This is a validated historical-series forecast, not current operational intelligence.",
+                gate_reason,
+            ],
         )
 
     def forecast_congestion_for_date(
@@ -345,43 +515,32 @@ class ForecastEngine:
                 ],
             )
 
-        horizon_days = int(max(1, horizon_weeks) * 7)
-        days_ahead = int((target_ts - last_date).days)
+        if target_ts <= last_date:
+            return ForecastResult(
+                status="no_data",
+                answer="No observed pressure value is available for that historical date.",
+                history=history_df,
+                forecast=None,
+                coverage_notes=self.kpi.coverage_notes(work, "date"),
+                caveats=["Historical gaps are not filled with forecasts."],
+            )
 
-        if 0 < days_ahead <= horizon_days and len(series) >= 14:
-            forecast_df = self._forecast_with_intervals(series, horizon_days=days_ahead)
-            target_row = forecast_df.iloc[-1]
-            pred = float(target_row["predicted"])
-            lower = float(target_row["lower"])
-            upper = float(target_row["upper"])
-            confidence = "high" if days_ahead <= 14 else "medium"
-            confidence_note = (
-                f"Confidence: {confidence} (model-based near-term forecast, horizon {days_ahead} day(s))."
+        days_ahead = int((target_ts - last_date).days)
+        if days_ahead > 56:
+            return self._unavailable(
+                f"Target date is {days_ahead} days after the latest observation; maximum validated horizon is 56 days.",
+                history=history_df,
             )
-            method_note = "Method: weekly-seasonal baseline + moving-average model."
-            analog_note = None
-        else:
-            pred, lower, upper, tier_label, sample_count, confidence, analog_dates, analog_points = self._seasonal_analog(
-                series=series,
-                target_date=target_ts,
-            )
-            forecast_df = pd.DataFrame(
-                [{"date": target_ts, "predicted": pred, "lower": lower, "upper": upper}]
-            )
-            confidence_note = (
-                f"Confidence: {confidence} (seasonal analog tier: {tier_label}, sample n={sample_count})."
-            )
-            method_note = f"Method: seasonal historical analog ({tier_label})."
-            analog_note = (
-                "Analog dates used: " + ", ".join(analog_dates[:12])
-                if analog_dates
-                else "Analog dates used: none"
-            )
-            analog_values_note = (
-                "Analog values used: " + ", ".join(analog_points[:12])
-                if analog_points
-                else "Analog values used: none"
-            )
+        if len(series) < 14:
+            return self._unavailable("Need at least 14 historical daily points for a forecast.", history=history_df)
+        _gate_passed, gate_reason = self._quality_gate("congestion", port)
+
+        forecast_df = self._forecast_with_intervals(series, horizon_days=days_ahead)
+        target_row = forecast_df.iloc[-1]
+        pred = float(target_row["predicted"])
+        lower = float(target_row["lower"])
+        upper = float(target_row["upper"])
+        method_note = "Method: weekly-seasonal baseline + moving-average model."
 
         meaning = self._congestion_meaning(pred)
         level = self._congestion_level(pred)
@@ -390,14 +549,11 @@ class ForecastEngine:
         notes.append(f"Target date: {target_ts.strftime('%Y-%m-%d')}")
         notes.append(method_note)
         notes.append(f"Meaning: {meaning}")
-        if analog_note:
-            notes.append(analog_note)
-            notes.append(analog_values_note)
 
         caveats = [
             "Congestion index is a proxy from arrivals and dwell-time availability, not berth-level operations.",
             "Forecast is based on historical seasonal patterns in available data.",
-            confidence_note,
+            gate_reason,
         ]
         if "has_dwell" in work.columns and work["has_dwell"].fillna(False).mean() < 0.5:
             caveats.append("Dwell coverage is sparse, so forecast is more arrival-driven.")
@@ -408,7 +564,7 @@ class ForecastEngine:
                 f"Predicted congestion index at {port or 'selected port'} on {target_ts.strftime('%Y-%m-%d')} "
                 f"is {pred:.2f} (range {lower:.2f} to {upper:.2f}). "
                 f"This indicates {level} pressure versus baseline (1.00). "
-                f"The estimate is anchored to historical matches from the same calendar date/seasonal pattern."
+                "The calculation uses the available historical series."
             ),
             history=history_df,
             forecast=forecast_df,
@@ -450,6 +606,10 @@ class ForecastEngine:
                 caveats=["Need at least 14 daily points for congestion forecast."],
             )
 
+        if int(horizon_weeks) > 8:
+            return self._unavailable("Forecast horizon exceeds the maximum validated window of eight weeks.")
+        _gate_passed, gate_reason = self._quality_gate("congestion", port)
+
         horizon_days = int(max(1, horizon_weeks) * 7)
         forecast_df = self._forecast_with_intervals(series, horizon_days=horizon_days)
         forecast_df["day_of_week"] = pd.to_datetime(forecast_df["date"], utc=True).dt.day_name()
@@ -461,9 +621,10 @@ class ForecastEngine:
         low_pred = float(target_rows["lower"].mean())
         high_pred = float(target_rows["upper"].mean())
 
+        last_date = pd.Timestamp(series.index.max()).strftime("%Y-%m-%d")
         answer = (
-            f"Forecasted congestion index for {target} is {mean_pred:.2f} "
-            f"(interval {low_pred:.2f} to {high_pred:.2f}) over the next {horizon_weeks} week(s). "
+            f"Historical-data forecast anchored after {last_date}: congestion index for {target} is {mean_pred:.2f} "
+            f"(interval {low_pred:.2f} to {high_pred:.2f}) over the following {horizon_weeks} week(s). "
             f"This indicates {self._congestion_level(mean_pred)} pressure versus baseline (1.00)."
         )
 
@@ -478,6 +639,7 @@ class ForecastEngine:
         caveats: List[str] = [
             "Congestion index is a proxy from arrivals and dwell-time availability, not berth-level operations.",
             "Forecast reflects historical weekly patterns only.",
+            gate_reason,
         ]
         if work["has_dwell"].fillna(False).mean() < 0.5:
             caveats.append("Dwell coverage is sparse, so forecast is more arrival-driven.")
@@ -489,4 +651,159 @@ class ForecastEngine:
             forecast=forecast_df,
             coverage_notes=notes,
             caveats=caveats,
+        )
+
+    @staticmethod
+    def _prediction_triplet(
+        result: ForecastResult,
+        *,
+        target_date: Optional[str] = None,
+        target_dow: Optional[str] = None,
+    ) -> Optional[tuple[float, float, float]]:
+        if result.status != "ok" or result.forecast is None or result.forecast.empty:
+            return None
+        rows = result.forecast.copy()
+        rows["date"] = pd.to_datetime(rows["date"], errors="coerce", utc=True).dt.floor("D")
+        rows = rows.dropna(subset=["date", "predicted", "lower", "upper"])
+        if rows.empty:
+            return None
+        if target_date:
+            target = pd.to_datetime(target_date, errors="coerce", utc=True)
+            if pd.notna(target):
+                picked = rows[rows["date"] == pd.Timestamp(target).floor("D")]
+                if picked.empty:
+                    picked = rows.tail(1)
+                return tuple(float(picked[col].mean()) for col in ("predicted", "lower", "upper"))
+        if target_dow:
+            picked = rows[rows["date"].dt.day_name() == target_dow.title()]
+            if picked.empty:
+                picked = rows.tail(1)
+            return tuple(float(picked[col].mean()) for col in ("predicted", "lower", "upper"))
+        picked = rows.tail(1)
+        return tuple(float(picked[col].mean()) for col in ("predicted", "lower", "upper"))
+
+    def compare_congestion_ports(
+        self,
+        ports: List[str],
+        *,
+        target_date: Optional[str],
+        target_dow: Optional[str],
+        horizon_weeks: int,
+    ) -> ForecastResult:
+        unique_ports = list(dict.fromkeys(str(port).strip() for port in ports if str(port).strip()))
+        if len(unique_ports) < 2:
+            return ForecastResult(
+                status="no_data",
+                answer="Comparison forecast needs at least two distinct ports.",
+                history=None,
+                forecast=None,
+                coverage_notes=[],
+                caveats=[],
+            )
+
+        rows: List[Dict[str, float | str]] = []
+        coverage_notes: List[str] = []
+        caveats: List[str] = []
+        missing: List[str] = []
+        for port in unique_ports:
+            forecast = (
+                self.forecast_congestion_for_date(port=port, target_date=target_date, horizon_weeks=horizon_weeks)
+                if target_date
+                else self.forecast_congestion(port=port, target_dow=target_dow or "Friday", horizon_weeks=horizon_weeks)
+            )
+            triplet = self._prediction_triplet(forecast, target_date=target_date, target_dow=target_dow)
+            if triplet is None:
+                missing.append(port)
+                continue
+            predicted, lower, upper = triplet
+            rows.append({"port": port, "predicted": predicted, "lower": lower, "upper": upper})
+            for item in forecast.coverage_notes:
+                if item not in coverage_notes:
+                    coverage_notes.append(item)
+            for item in forecast.caveats:
+                if item not in caveats:
+                    caveats.append(item)
+        if len(rows) < 2:
+            return ForecastResult(
+                status="no_data",
+                answer="Could not compute forecasts for at least two requested ports.",
+                history=None,
+                forecast=None,
+                coverage_notes=coverage_notes,
+                caveats=caveats[:6],
+            )
+
+        table = pd.DataFrame(rows).sort_values("predicted", ascending=False).reset_index(drop=True)
+        target_label = target_date or (target_dow or "selected period")
+        values = ", ".join(
+            f"{row['port']}={float(row['predicted']):.2f} ({float(row['lower']):.2f}-{float(row['upper']):.2f})"
+            for _, row in table.iterrows()
+        )
+        answer = (
+            f"Predicted port-pressure comparison for {target_label}: {values}. "
+            f"{table.iloc[0]['port']} is likely highest."
+        )
+        if missing:
+            answer += f" No forecast was available for {', '.join(missing)}."
+        coverage_notes.insert(0, f"Ports forecast: {', '.join(table['port'].tolist())}")
+        if missing:
+            coverage_notes.append(f"Requested ports without a forecast: {', '.join(missing)}")
+        return ForecastResult(
+            status="ok",
+            answer=answer,
+            history=None,
+            forecast=table.set_index("port")[["predicted", "lower", "upper"]],
+            coverage_notes=coverage_notes,
+            caveats=caveats[:6],
+        )
+
+    def compare_congestion_weekdays(
+        self,
+        port: str,
+        *,
+        day_a: str,
+        day_b: str,
+        horizon_weeks: int,
+    ) -> ForecastResult:
+        rows: List[Dict[str, float | str]] = []
+        notes: List[str] = []
+        caveats: List[str] = []
+        for day in (day_a.title(), day_b.title()):
+            forecast = self.forecast_congestion(port=port, target_dow=day, horizon_weeks=horizon_weeks)
+            triplet = self._prediction_triplet(forecast, target_dow=day)
+            if triplet is None:
+                continue
+            predicted, lower, upper = triplet
+            rows.append({"day_of_week": day, "predicted": predicted, "lower": lower, "upper": upper})
+            for item in forecast.coverage_notes:
+                if item not in notes:
+                    notes.append(item)
+            for item in forecast.caveats:
+                if item not in caveats:
+                    caveats.append(item)
+        if len(rows) < 2:
+            return ForecastResult(
+                status="no_data",
+                answer="Could not forecast both requested weekdays.",
+                history=None,
+                forecast=None,
+                coverage_notes=notes,
+                caveats=caveats[:6],
+            )
+        table = pd.DataFrame(rows).sort_values("predicted", ascending=False).reset_index(drop=True)
+        details = ", ".join(
+            f"{row['day_of_week']}={float(row['predicted']):.2f} ({float(row['lower']):.2f}-{float(row['upper']):.2f})"
+            for _, row in table.iterrows()
+        )
+        answer = (
+            f"Forecasted port pressure at {port}: {details}. "
+            f"{table.iloc[0]['day_of_week']} is likely more congested."
+        )
+        return ForecastResult(
+            status="ok",
+            answer=answer,
+            history=None,
+            forecast=table.set_index("day_of_week")[["predicted", "lower", "upper"]],
+            coverage_notes=notes,
+            caveats=caveats[:6],
         )

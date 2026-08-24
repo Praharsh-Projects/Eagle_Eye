@@ -1,0 +1,69 @@
+{
+  "snapshot": "2026-12-31T23:40:00Z",
+  "portnet": {
+    "dataUpdatedTime": "2026-12-31T23:39:00Z",
+    "portCalls": [
+      {
+        "portCallId": 2001,
+        "portCallTimestamp": "2026-12-31T23:39:10Z",
+        "portToVisit": "FIHEL",
+        "vesselName": "ARUNA CIHAN",
+        "imoLloyds": 9543756,
+        "mmsi": 230123250,
+        "portAreaDetails": [
+          {
+            "eta": "2027-01-01T00:30:00Z",
+            "etaTimestamp": "2026-12-31T23:39:00Z",
+            "etaSource": "SHIP_AGENT",
+            "portAreaCode": "HEL-A"
+          }
+        ]
+      }
+    ]
+  },
+  "metadata": {
+    "name": "ARUNA CIHAN",
+    "timestamp": 1798760100000,
+    "shipType": 70,
+    "mmsi": 230123250,
+    "draught": 68,
+    "imo": 9543756,
+    "callSign": "V7WW7",
+    "eta": 67648,
+    "posType": 15,
+    "referencePointA": 160,
+    "referencePointB": 33,
+    "referencePointC": 20,
+    "referencePointD": 12,
+    "destination": "FIHEL"
+  },
+  "locations": {
+    "type": "FeatureCollection",
+    "dataUpdatedTime": "2026-12-31T23:39:00Z",
+    "features": [
+      {
+        "mmsi": 230123250,
+        "type": "Feature",
+        "geometry": {
+          "type": "Point",
+          "coordinates": [
+            24.6325,
+            59.9732
+          ]
+        },
+        "properties": {
+          "mmsi": 230123250,
+          "sog": 10.7,
+          "cog": 326.6,
+          "navStat": 0,
+          "rot": 0,
+          "posAcc": true,
+          "raim": false,
+          "heading": 325,
+          "timestamp": 0,
+          "timestampExternal": 1798760280000
+        }
+      }
+    ]
+  }
+}

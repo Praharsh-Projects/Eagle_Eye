@@ -1,0 +1,68 @@
+{
+  "dataUpdatedTime": "2026-07-27T11:58:00Z",
+  "portCalls": [
+    {
+      "portCallId": 1001,
+      "portCallTimestamp": "2026-07-27T11:57:30Z",
+      "portToVisit": "FIHEL",
+      "vesselName": "ARUNA CIHAN",
+      "radioCallSign": "V7WW7",
+      "imoLloyds": 9543756,
+      "mmsi": 230123250,
+      "vesselTypeCode": 70,
+      "portAreaDetails": [
+        {
+          "eta": "2026-07-28T06:00:00Z",
+          "etaTimestamp": "2026-07-27T11:57:00Z",
+          "etaSource": "SHIP_AGENT",
+          "portAreaCode": "HEL-A",
+          "portAreaName": "Helsinki A",
+          "berthCode": "A1",
+          "berthName": "Berth A1"
+        }
+      ]
+    },
+    {
+      "portCallId": 1003,
+      "portCallTimestamp": "2026-07-27T11:57:45Z",
+      "portToVisit": "FITKU",
+      "vesselName": "TURKU TRADER",
+      "radioCallSign": "OJBB",
+      "imoLloyds": 9876543,
+      "mmsi": 230123252,
+      "vesselTypeCode": 70,
+      "portAreaDetails": [
+        {
+          "eta": "2026-07-28T08:00:00Z",
+          "etaTimestamp": "2026-07-27T11:57:15Z",
+          "etaSource": "PORT",
+          "portAreaCode": "TKU-A",
+          "portAreaName": "Turku A",
+          "berthCode": "T1",
+          "berthName": "Berth T1"
+        }
+      ]
+    },
+    {
+      "portCallId": 1002,
+      "portCallTimestamp": "2026-07-27T11:57:40Z",
+      "portToVisit": "FIHEL",
+      "vesselName": "BORE STAR",
+      "radioCallSign": "OJAA",
+      "imoLloyds": 9786190,
+      "mmsi": 230123251,
+      "vesselTypeCode": 70,
+      "portAreaDetails": [
+        {
+          "eta": "2026-07-31T08:00:00Z",
+          "etaTimestamp": "2026-07-27T11:57:10Z",
+          "etaSource": "PORT",
+          "portAreaCode": "HEL-B",
+          "portAreaName": "Helsinki B",
+          "berthCode": "B2",
+          "berthName": "Berth B2"
+        }
+      ]
+    }
+  ]
+}

@@ -52,6 +52,7 @@ UNSUPPORTED_REGEX_PATTERNS = (
 
 ANOMALY_KEYWORDS = (
     "anomaly",
+    "anomalies",
     "unusual",
     "spike",
     "suspicious",
@@ -70,6 +71,7 @@ FORECAST_KEYWORDS = (
     "coming",
     "future",
     "will",
+    "tomorrow",
 )
 
 CARBON_KEYWORDS = (
@@ -114,10 +116,18 @@ TEMPORAL_PATTERN_KEYWORDS = (
     "weekday",
     "day-of-week",
     "hour",
+    "busier",
+    "quieter",
 )
 
 DESCRIPTIVE_KEYWORDS = (
     "how many",
+    "how long",
+    "how much time",
+    "above baseline",
+    "below baseline",
+    "against baseline",
+    "relative to",
     "count",
     "top",
     "average",
@@ -125,6 +135,8 @@ DESCRIPTIVE_KEYWORDS = (
     "median",
     "list",
     "show",
+    "plot",
+    "graph",
     "what is",
 )
 
@@ -173,6 +185,8 @@ PORT_TOKEN_STOPWORDS = {
     "TREND",
     "INDEX",
     "LEVEL",
+    "FIRST",
+    "EARLIEST",
     "ISTHE",
     "MONTHLY",
     "FOR",
@@ -213,12 +227,19 @@ NON_PORT_CODE_TOKENS = {
 LOCODE_RE = re.compile(r"\b([A-Z]{2})\s?([A-Z]{3})\b")
 ISO_DATE_RE = re.compile(r"\b(20\d{2}-\d{2}-\d{2})\b")
 MONTH_YEAR_RE = re.compile(
-    r"\b(january|february|march|april|may|june|july|august|september|october|november|december)\s+(20\d{2})\b",
+    r"\b(january|february|march|april|may|june|july|august|september|october|november|december)\s+(?:of\s+)?(20\d{2})\b",
     re.IGNORECASE,
 )
 YEAR_MONTH_RE = re.compile(r"\b(20\d{2})-(0[1-9]|1[0-2])\b")
+YEAR_ONLY_RE = re.compile(r"\b(?:in|during|for)\s+(20\d{2})\b", re.IGNORECASE)
 LAST_WEEKS_RE = re.compile(r"\blast\s+(\d{1,2})\s+weeks?\b", re.IGNORECASE)
 HORIZON_WEEKS_RE = re.compile(r"\b(\d{1,2})\s+weeks?\b", re.IGNORECASE)
+TOP_N_RE = re.compile(r"\btop\s+(\d{1,2})\b", re.IGNORECASE)
+NUMBER_WORD_LIMIT_RE = re.compile(
+    r"\b(?:top\s+)?(one|two|three|four|five|six|seven|eight|nine|ten)\s+"
+    r"(?:(?:swedish|finnish|estonian|latvian|lithuanian|polish|danish|german)\s+)?ports?\b",
+    re.IGNORECASE,
+)
 MMSI_RE = re.compile(r"\bmmsi\s*[:#]?\s*(\d{6,9})\b", re.IGNORECASE)
 IMO_RE = re.compile(r"\bimo\s*[:#]?\s*(\d{6,8})\b", re.IGNORECASE)
 CALL_ID_RE = re.compile(r"\bcall[_\-\s]?id[\s:=_\-]*([A-Za-z0-9_\-:.]+)\b", re.IGNORECASE)
@@ -232,19 +253,34 @@ RELATIVE_DOW_RE = re.compile(
     r"\b(next|this)\s+(monday|tuesday|wednesday|thursday|friday|saturday|sunday)\b",
     re.IGNORECASE,
 )
+CURRENT_TIME_RE = re.compile(r"\b(today|now|currently|current|live|real[ -]?time)\b", re.IGNORECASE)
+RELATIVE_DAY_RE = re.compile(r"\b(yesterday|tomorrow)\b", re.IGNORECASE)
 
 BALTIC_LOCODE_PREFIXES = {"SE", "FI", "LV", "LT", "PL", "EE", "DK", "DE", "NO", "RU"}
 PORT_PHRASE_RE = re.compile(
-    r"\b(?:at|in|near|to|for|from)\s+([A-Za-z][A-Za-z\- ]{2,48})",
+    r"\b(?:at|in|near|to|for|from)\s+"
+    r"([^\W\d_][^\d,;?.!()]{1,48}?)"
+    r"(?=\s+(?:throughout|during|within|between|from|to|on|for|with|by|over|"
+    r"today|tomorrow|now|currently|this|next|last)\b|\s*\([A-Z]{2}\s?[A-Z]{3}\)|[,;?.!()]|$)",
     flags=re.IGNORECASE,
 )
 BETWEEN_PORTS_RE = re.compile(
     r"\bbetween\s+([A-Za-z0-9\- ]{2,24})\s+and\s+([A-Za-z0-9\- ]{2,24})",
     flags=re.IGNORECASE,
 )
+FROM_TO_PORTS_RE = re.compile(
+    r"\bfrom\s+([A-Za-z0-9\- ]{2,32}?)\s+to\s+([A-Za-z0-9\- ]{2,32}?)(?=\s+(?:and|,|;|$)|[.?!]|$)",
+    flags=re.IGNORECASE,
+)
 KNOWN_PORT_ALIASES = {
     "gothenburg",
     "goteborg",
+    "goteborgs",
+    "helsinki",
+    "sodertalje",
+    "södertälje",
+    "karlshamn",
+    "karlskrona",
     "gdansk",
     "gdynia",
     "klaipeda",
@@ -254,6 +290,39 @@ KNOWN_PORT_ALIASES = {
     "szczecin",
     "lubeck",
     "ventspils",
+}
+
+COUNTRY_NAME_TO_CODE = {
+    "sweden": "SE",
+    "swedish": "SE",
+    "finland": "FI",
+    "finnish": "FI",
+    "estonia": "EE",
+    "estonian": "EE",
+    "latvia": "LV",
+    "latvian": "LV",
+    "lithuania": "LT",
+    "lithuanian": "LT",
+    "poland": "PL",
+    "polish": "PL",
+    "denmark": "DK",
+    "danish": "DK",
+    "germany": "DE",
+    "german": "DE",
+    "norway": "NO",
+    "norwegian": "NO",
+}
+NUMBER_WORDS = {
+    "one": 1,
+    "two": 2,
+    "three": 3,
+    "four": 4,
+    "five": 5,
+    "six": 6,
+    "seven": 7,
+    "eight": 8,
+    "nine": 9,
+    "ten": 10,
 }
 
 
@@ -283,28 +352,114 @@ def _extract_special_dow(question: str) -> Optional[str]:
     return None
 
 
-def _extract_metric(question: str) -> str:
+def _extract_metric(question: str) -> Optional[str]:
     q = question.lower()
-    if "dwell" in q:
+    explicit_port_stay = any(
+        token in q
+        for token in (
+            "dwell",
+            "port stay",
+            "port-stay",
+            "stayed in port",
+            "stay duration",
+            "time in port",
+            "time at port",
+        )
+    )
+    duration_cue = bool(
+        re.search(
+            r"\b(?:how\s+long|how\s+much\s+time|how\s+many\s+(?:minutes?|hours?)|time\s+spent|duration)\b",
+            q,
+        )
+    )
+    port_presence_cue = bool(
+        re.search(
+            r"\b(?:in|at)\s+(?:the\s+)?port\b|\b(?:remain(?:ed)?|stay(?:ed)?|spend|spent)\b.{0,32}\bport\b",
+            q,
+        )
+    )
+    if explicit_port_stay or (duration_cue and port_presence_cue):
         return "dwell_minutes"
-    if "congestion" in q or "busy" in q:
+    if any(token in q for token in ("travel time", "route time", "duration", "eta")):
+        return "route_duration_h"
+    if "congestion" in q or "congested" in q or "pressure" in q or "busy" in q:
         return "congestion_index"
     if "occupancy" in q:
         return "occupancy_vessels"
-    if "arrival" in q or "arrive" in q:
-        return "arrivals_vessels"
+    if any(token in q for token in ("arrival", "arrive", "arriving", "ship call", "vessel call", "port call")):
+        return "arrival_count"
     if "spike" in q or "anomaly" in q:
         return "arrivals_spike"
-    return "arrivals_vessels"
+    return None
 
 
 def _extract_aggregation(question: str) -> Optional[str]:
     q = question.lower()
+    if any(token in q for token in ("share", "composition", "proportion", "percentage")) and any(
+        token in q for token in ("vessel type", "ship type", "arrivals by type")
+    ):
+        return "vessel_type_composition"
+    if "divided between" in q and any(
+        token in q for token in ("cargo", "tanker", "vessel", "ship")
+    ):
+        return "vessel_type_composition"
+    if "mean" in q or "average" in q:
+        if any(token in q for token in ("dwell", "port stay", "time at port", "time in port")):
+            return "mean"
+    if "median" in q and any(
+        token in q for token in ("dwell", "port stay", "time at port", "time in port")
+    ):
+        return "median"
+    if "distribution" in q and any(token in q for token in ("dwell", "port stay", "stay duration")):
+        return "dwell_distribution"
+    if any(token in q for token in ("median", "p90", "percentile")) and any(
+        token in q for token in ("route", "travel time", "duration", "voyage")
+    ):
+        return "route_travel_time_summary"
+    if any(token in q for token in ("travel time", "route time", "route duration")) and (
+        ("from" in q and "to" in q) or "route" in q
+    ):
+        return "route_travel_time_summary"
+    if any(token in q for token in ("first", "earliest")):
+        if "from" in q and "to" in q and any(token in q for token in ("vessel", "ship", "voyage", "arrival", "depart")):
+            return "first_route_vessel"
+        if "depart" in q:
+            return "first_departure"
+        if any(token in q for token in ("arrival", "arrive", "arrival seen", "first seen")):
+            return "first_arrival"
+    if any(token in q for token in ("last", "latest", "most recent")) and any(
+        token in q for token in ("arrival", "arrive")
+    ):
+        return "last_arrival"
     if any(token in q for token in ("highest", "maximum", "max", "peak")) and any(
         token in q for token in ("day", "date")
     ):
         return "peak_day"
+    if TOP_N_RE.search(question) and any(token in q for token in ("pressure", "congestion")):
+        return "peak_day"
     return None
+
+
+def _extract_limit(question: str) -> int:
+    hit = TOP_N_RE.search(question)
+    if hit:
+        return max(1, min(int(hit.group(1)), 20))
+    word_hit = NUMBER_WORD_LIMIT_RE.search(question)
+    if word_hit:
+        return NUMBER_WORDS[word_hit.group(1).lower()]
+    return 1
+
+
+def _extract_country_codes(question: str) -> List[str]:
+    hits: List[tuple[int, str]] = []
+    for token, code in COUNTRY_NAME_TO_CODE.items():
+        for match in re.finditer(rf"\b{re.escape(token)}\b", question, re.IGNORECASE):
+            hits.append((match.start(), code))
+    output: List[str] = []
+    for _, code in sorted(hits):
+        if code not in output:
+            output.append(code)
+    return output
 
 
 def _extract_vessel_type(question: str) -> Optional[str]:
@@ -320,7 +475,11 @@ def _extract_vessel_type(question: str) -> Optional[str]:
 
 def _extract_carbon_boundary(question: str) -> str:
     q = question.lower()
-    if any(token in q for token in ("wtw", "well-to-wake", "well to wake", "lifecycle", "co2e")):
+    has_ttw = any(token in q for token in ("ttw", "tank-to-wake", "tank to wake"))
+    has_wtw = any(token in q for token in ("wtw", "well-to-wake", "well to wake", "lifecycle"))
+    if has_ttw and has_wtw:
+        return "TTW_WTW"
+    if has_wtw:
         return "WTW"
     return "TTW"
 
@@ -345,6 +504,56 @@ def _extract_carbon_pollutants(question: str) -> List[str]:
     return out
 
 
+def _extract_source_scope(question: str) -> Optional[str]:
+    q = (question or "").lower()
+    if any(token in q for token in ("port-call", "port call", "port calls", "according to port-call", "according to port call")):
+        return "port_call"
+    if any(token in q for token in ("ais-derived", "ais derived", "ais destination proxy", "ais proxy")):
+        return "ais_destination_proxy"
+    return None
+
+
+def _clean_source_scope_artifacts(entities: Dict[str, Any]) -> Dict[str, Any]:
+    source_scope = entities.get("source_scope")
+    if not source_scope:
+        return entities
+
+    bad_tokens = {
+        "port-call records",
+        "port call records",
+        "port-call",
+        "port call",
+        "port calls",
+        "according",
+        "records",
+        "ais-derived",
+        "ais derived",
+        "ais proxy",
+    }
+
+    clean_ports = []
+    for item in entities.get("ports") or []:
+        token = str(item or "").strip()
+        if token.lower() in bad_tokens:
+            continue
+        clean_ports.append(token)
+    entities["ports"] = clean_ports
+    if entities.get("port") and str(entities.get("port")).strip().lower() in bad_tokens:
+        entities["port"] = clean_ports[0] if clean_ports else None
+
+    clean_pairs = []
+    for pair in entities.get("route_pairs") or []:
+        origin = str(pair.get("origin") or "").strip()
+        destination = str(pair.get("destination") or "").strip()
+        if not origin or not destination:
+            continue
+        if origin.lower() in bad_tokens or destination.lower() in bad_tokens:
+            continue
+        clean_pairs.append({"origin": origin, "destination": destination})
+    entities["route_pairs"] = clean_pairs
+    return entities
+
+
 def _is_locode_like(token: str) -> bool:
     t = (token or "").upper().replace(" ", "")
     if not re.fullmatch(r"[A-Z]{5}", t):
@@ -359,7 +568,7 @@ def _clean_port_phrase(raw: str) -> str:
     if not text:
         return ""
     text = re.split(
-        r"\b(?:between|from|on|during|next|last|this|for|with|where|when|which|in)\b",
+        r"\b(?:between|from|to|on|during|next|last|this|for|with|where|when|which|in|by|above|below|against|baseline)\b",
         text,
         maxsplit=1,
         flags=re.IGNORECASE,
@@ -367,10 +576,25 @@ def _clean_port_phrase(raw: str) -> str:
     return text
 
 
+def _split_port_candidates(raw: str) -> List[str]:
+    text = (raw or "").strip()
+    if not text:
+        return []
+    chunks = re.split(r"\s+(?:and|&)\s+|[,/]", text, flags=re.IGNORECASE)
+    out: List[str] = []
+    for chunk in chunks:
+        cleaned = _clean_port_phrase(chunk)
+        if cleaned:
+            out.append(cleaned)
+    return out
+
+
 def _looks_like_port_name(value: str) -> bool:
     if not value:
         return False
     low = value.lower().strip()
+    if low.upper() in NON_PORT_CODE_TOKENS or low.upper() in PORT_TOKEN_STOPWORDS:
+        return False
     if not low or low in {"port", "index", "level", "daily", "trend", "monthly"}:
         return False
     if low in KNOWN_PORT_ALIASES:
@@ -395,10 +619,20 @@ def _looks_like_port_name(value: str) -> bool:
         "vessel",
         "ship",
         "tanker",
+        "tankers",
         "cargo",
+        "cargos",
         "container",
         "hours",
         "hour",
+        "route",
+        "routes",
+        "duration",
+        "durations",
+        "arrival",
+        "arrivals",
+        "departure",
+        "departures",
         "knots",
         "knot",
         "mode",
@@ -409,6 +643,15 @@ def _looks_like_port_name(value: str) -> bool:
         "nox",
         "sox",
         "pm",
+        "poland",
+        "sweden",
+        "finland",
+        "estonia",
+        "latvia",
+        "lithuania",
+        "germany",
+        "denmark",
+        "norway",
     }
     if any(tok in bad_tokens for tok in words):
         return False
@@ -439,19 +682,32 @@ def _extract_ports(question: str) -> List[str]:
             ports.append(raw)
 
     for phrase in PORT_PHRASE_RE.findall(question):
-        cleaned = _clean_port_phrase(phrase)
-        if not cleaned:
-            continue
-        cleaned_code = cleaned.upper().replace(" ", "")
-        if _is_locode_like(cleaned_code):
-            if cleaned_code not in ports:
-                ports.append(cleaned_code)
-            continue
-        if _looks_like_port_name(cleaned) and cleaned not in ports:
-            ports.append(cleaned)
+        for cleaned in _split_port_candidates(phrase):
+            if not cleaned:
+                continue
+            cleaned_code = cleaned.upper().replace(" ", "")
+            if _is_locode_like(cleaned_code):
+                if cleaned_code not in ports:
+                    ports.append(cleaned_code)
+                continue
+            if _looks_like_port_name(cleaned) and cleaned not in ports:
+                ports.append(cleaned)
 
-    for a_raw, b_raw in BETWEEN_PORTS_RE.findall(question):
-        for item in (_clean_port_phrase(a_raw), _clean_port_phrase(b_raw)):
+    if "divided between" not in question.lower():
+        for a_raw, b_raw in BETWEEN_PORTS_RE.findall(question):
+            for item in (_clean_port_phrase(a_raw), _clean_port_phrase(b_raw)):
+                if not item:
+                    continue
+                item_code = item.upper().replace(" ", "")
+                if _is_locode_like(item_code):
+                    if item_code not in ports:
+                        ports.append(item_code)
+                    continue
+                if _looks_like_port_name(item) and item not in ports:
+                    ports.append(item)
+
+    for origin_raw, destination_raw in FROM_TO_PORTS_RE.findall(question):
+        for item in (_clean_port_phrase(origin_raw), _clean_port_phrase(destination_raw)):
             if not item:
                 continue
             item_code = item.upper().replace(" ", "")
@@ -466,7 +722,80 @@ def _extract_ports(question: str) -> List[str]:
     for port in ports:
         if port not in deduped:
             deduped.append(port)
+    # ``Name (LOCODE)`` is one entity, not a two-port comparison.  Retain the
+    # canonical code and remove only the exact adjacent name token; unrelated
+    # names elsewhere in the question remain untouched.
+    explicit_codes = [port for port in deduped if _is_locode_like(port)]
+    if explicit_codes:
+        deduped = [
+            port
+            for port in deduped
+            if _is_locode_like(port)
+            or not any(
+                re.search(
+                    rf"\b{re.escape(port)}\s*\(\s*{re.escape(code[:2])}\s?{re.escape(code[2:])}\s*\)",
+                    question,
+                    re.IGNORECASE,
+                )
+                for code in explicit_codes
+            )
+        ]
     return deduped[:4]
+
+
+def _extract_origin_destination(question: str) -> tuple[Optional[str], Optional[str]]:
+    hit = FROM_TO_PORTS_RE.search(question)
+    if not hit:
+        return None, None
+    origin_raw = _clean_port_phrase(hit.group(1))
+    destination_raw = _clean_port_phrase(hit.group(2))
+
+    def _normalize(value: str) -> Optional[str]:
+        if not value:
+            return None
+        code = value.upper().replace(" ", "")
+        if _is_locode_like(code):
+            return code
+        if _looks_like_port_name(value):
+            return value
+        return None
+
+    return _normalize(origin_raw), _normalize(destination_raw)
+
+
+def _extract_route_pairs(question: str) -> List[Dict[str, str]]:
+    pairs: List[Dict[str, str]] = []
+    for origin_raw, destination_raw in FROM_TO_PORTS_RE.findall(question):
+        origin_clean = _clean_port_phrase(origin_raw)
+        destination_clean = _clean_port_phrase(destination_raw)
+        if not origin_clean or not destination_clean:
+            continue
+        if origin_clean.lower() == destination_clean.lower():
+            continue
+        pair = {"origin": origin_clean, "destination": destination_clean}
+        if pair not in pairs:
+            pairs.append(pair)
+
+    lower_q = question.lower()
+    if " to " in lower_q:
+        route_text = question
+        if "from " in lower_q:
+            route_text = re.split(r"\bfrom\b", question, maxsplit=1, flags=re.IGNORECASE)[1]
+        route_parts = re.split(r"\s+\band\b\s+|[,/]", route_text, flags=re.IGNORECASE)
+        for part in route_parts:
+            hit = re.search(r"([A-Za-z0-9\- ]{2,32})\s+\bto\b\s+([A-Za-z0-9\- ]{2,32})", part, flags=re.IGNORECASE)
+            if not hit:
+                continue
+            origin_clean = _clean_port_phrase(hit.group(1))
+            destination_clean = _clean_port_phrase(hit.group(2))
+            if not origin_clean or not destination_clean:
+                continue
+            if origin_clean.lower() == destination_clean.lower():
+                continue
+            pair = {"origin": origin_clean, "destination": destination_clean}
+            if pair not in pairs:
+                pairs.append(pair)
+    return pairs[:6]
 
 
 def _month_start_end(month_name: str, year: int) -> tuple[str, str]:
@@ -500,10 +829,27 @@ def _extract_date_range(question: str) -> tuple[Optional[str], Optional[str], Op
         end = start + pd.offsets.MonthEnd(0)
         return start.strftime("%Y-%m-%d"), end.strftime("%Y-%m-%d"), None
 
+    year_match = YEAR_ONLY_RE.search(question)
+    if year_match:
+        year = int(year_match.group(1))
+        return f"{year:04d}-01-01", f"{year:04d}-12-31", None
+
     last_weeks_match = LAST_WEEKS_RE.search(question)
     if last_weeks_match:
         weeks = int(last_weeks_match.group(1))
         return None, None, f"last_{weeks}_weeks"
+
+    relative_hit = RELATIVE_DAY_RE.search(question)
+    if relative_hit:
+        now = pd.Timestamp.now(tz="UTC").floor("D")
+        offset = -1 if relative_hit.group(1).lower() == "yesterday" else 1
+        target = now + pd.Timedelta(days=offset)
+        value = target.strftime("%Y-%m-%d")
+        return value, value, None
+
+    if CURRENT_TIME_RE.search(question):
+        today = pd.Timestamp.now(tz="UTC").floor("D").strftime("%Y-%m-%d")
+        return today, today, None
 
     return None, None, None
 
@@ -537,7 +883,7 @@ def _extract_target_date(question: str) -> Optional[str]:
     if rel_hit:
         mode = rel_hit.group(1).lower()
         day = rel_hit.group(2).lower()
-        now = pd.Timestamp.now().floor("D")
+        now = pd.Timestamp.now(tz="UTC").floor("D")
         target_idx = DOW_NAMES.index(day)
         delta = (target_idx - now.weekday()) % 7
         if mode == "next":
@@ -584,9 +930,28 @@ def classify_question(question: str) -> IntentResult:
         end_date = target_date
     dows = _extract_days_of_week(question)
     special_dow = _extract_special_dow(question)
+    origin_port, destination_port = _extract_origin_destination(question)
+    route_pairs = _extract_route_pairs(question)
+    ports = _extract_ports(question)
+    if route_pairs and "arrival" in q:
+        # In mixed queries, route endpoints are not automatically part of the
+        # separately requested port comparison.
+        port_clause = re.split(
+            r"\b(?:and\s+)?route(?:\s+travel)?\s+durations?\b",
+            question,
+            maxsplit=1,
+            flags=re.IGNORECASE,
+        )[0]
+        explicit_arrival_ports = _extract_ports(port_clause)
+        if explicit_arrival_ports:
+            ports = explicit_arrival_ports
     entities: Dict[str, Any] = {
-        "ports": _extract_ports(question),
+        "ports": ports,
+        "country_codes": _extract_country_codes(question),
         "port": None,
+        "origin_port": origin_port,
+        "destination_port": destination_port,
+        "route_pairs": route_pairs,
         "date_from": start_date,
         "date_to": end_date,
         "target_date": target_date,
@@ -596,12 +961,21 @@ def classify_question(question: str) -> IntentResult:
         "dow_compare": dows[1] if len(dows) > 1 else None,
         "metric": _extract_metric(question),
         "aggregation": _extract_aggregation(question),
+        "limit": _extract_limit(question),
         "horizon_weeks": _extract_horizon_weeks(question),
         "mmsi": None,
         "imo": None,
         "call_id": None,
         "boundary": _extract_carbon_boundary(question),
         "pollutants": _extract_carbon_pollutants(question),
+        "source_scope": _extract_source_scope(question),
+        "requires_current_data": bool(CURRENT_TIME_RE.search(question)),
+        "temporal_reference": (
+            "current"
+            if CURRENT_TIME_RE.search(question)
+            else ("relative" if RELATIVE_DAY_RE.search(question) or RELATIVE_DOW_RE.search(question) else "absolute")
+        ),
+        "visual_requested": bool(re.search(r"\b(?:plot|graph|chart|visuali[sz]e|show)\b", q)),
     }
 
     if entities["ports"]:
@@ -617,9 +991,12 @@ def classify_question(question: str) -> IntentResult:
     if call_hit:
         entities["call_id"] = _normalize_call_id(call_hit.group(1))
 
+    entities = _clean_source_scope_artifacts(entities)
+
     extraction_diag = {
         "ports_parsed": list(entities.get("ports") or []),
         "port_selected": entities.get("port"),
+        "route_pairs_parsed": list(entities.get("route_pairs") or []),
         "call_id_parsed": entities.get("call_id"),
         "date_from": entities.get("date_from"),
         "date_to": entities.get("date_to"),
@@ -627,8 +1004,26 @@ def classify_question(question: str) -> IntentResult:
     }
     entities["extraction_diagnostics"] = extraction_diag
 
+    retired_voyage_hits = [
+        token
+        for token in ("resolve voyage", "segment timeline", "voyage evidence")
+        if token in q
+    ]
+    if retired_voyage_hits:
+        entities["metric"] = "voyage"
+        extraction_diag["unsupported_hits"] = retired_voyage_hits
+        return IntentResult(
+            intent="G",
+            entities=entities,
+            reason=(
+                "The retired Voyage Lab workflow is not available. Ask for supported historical port-call, "
+                "AIS-event, route-duration, forecast, pressure, or carbon analytics instead."
+            ),
+        )
+
     unsupported_hits = _unsupported_hits(question)
     if unsupported_hits:
+        entities["metric"] = "unsupported"
         extraction_diag["unsupported_hits"] = unsupported_hits
         return IntentResult(
             intent="G",
@@ -637,6 +1032,7 @@ def classify_question(question: str) -> IntentResult:
         )
 
     if any(token in q for token in CARBON_KEYWORDS):
+        entities["metric"] = "emissions"
         return IntentResult(
             intent="H",
             entities=entities,
@@ -644,13 +1040,20 @@ def classify_question(question: str) -> IntentResult:
         )
 
     if any(token in q for token in ANOMALY_KEYWORDS):
+        if entities.get("mmsi") or any(
+            token in q
+            for token in ("jump", "spoof", "teleport", "impossible", "movement anomal", "position anomal")
+        ):
+            entities["metric"] = "ais_jump"
+        else:
+            entities["metric"] = "arrivals_spike"
         return IntentResult(intent="F", entities=entities, reason="Anomaly/suspicious pattern request.")
 
     if any(token in q for token in FORECAST_KEYWORDS):
         return IntentResult(intent="C", entities=entities, reason="Forecasting language detected.")
 
-    if any(token in q for token in COMPARE_KEYWORDS):
-        if entities.get("dow") or entities.get("dow_compare"):
+    if len(dows) >= 2 or any(token in q for token in COMPARE_KEYWORDS):
+        if entities.get("dow") and entities.get("dow_compare"):
             return IntentResult(
                 intent="B",
                 entities=entities,
@@ -660,16 +1063,25 @@ def classify_question(question: str) -> IntentResult:
     if any(token in q for token in COMPARE_KEYWORDS):
         return IntentResult(intent="D", entities=entities, reason="Comparative phrasing detected.")
 
+    if entities.get("aggregation") is not None:
+        return IntentResult(intent="A", entities=entities, reason="Supported deterministic aggregation detected.")
+
     if any(token in q for token in DIAGNOSTIC_KEYWORDS):
         return IntentResult(intent="E", entities=entities, reason="Diagnostic/explanatory phrasing detected.")
 
     if any(token in q for token in TEMPORAL_PATTERN_KEYWORDS):
         return IntentResult(intent="B", entities=entities, reason="Temporal pattern question detected.")
 
-    if any(token in q for token in DESCRIPTIVE_KEYWORDS):
+    if any(token in q for token in DESCRIPTIVE_KEYWORDS) and (
+        entities.get("metric") is not None or entities.get("aggregation") is not None
+    ):
         return IntentResult(intent="A", entities=entities, reason="Descriptive aggregation request.")
 
-    return IntentResult(intent="A", entities=entities, reason="Defaulting to descriptive analytics.")
+    return IntentResult(
+        intent="G",
+        entities=entities,
+        reason="No supported deterministic maritime metric was identified; route to app help, research, or general assistance.",
+    )
 
 
 def describe_intent(intent: str) -> str:

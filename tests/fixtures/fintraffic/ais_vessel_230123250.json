@@ -1,0 +1,16 @@
+{
+  "name": "ARUNA CIHAN",
+  "timestamp": 1785153300000,
+  "shipType": 70,
+  "mmsi": 230123250,
+  "draught": 68,
+  "imo": 9543756,
+  "callSign": "V7WW7",
+  "eta": 516574,
+  "posType": 15,
+  "referencePointA": 160,
+  "referencePointB": 33,
+  "referencePointC": 20,
+  "referencePointD": 12,
+  "destination": "FIHEL"
+}

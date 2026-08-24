@@ -2,14 +2,21 @@
 
 from __future__ import annotations
 
+import asyncio
 import os
-from dataclasses import asdict, dataclass
+import json
+from contextlib import asynccontextmanager
+from contextlib import suppress
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple, Union
 
 import numpy as np
 import pandas as pd
 from fastapi import FastAPI, HTTPException, Query
+from fastapi.responses import FileResponse, StreamingResponse
+from fastapi.staticfiles import StaticFiles
+from openai import OpenAI
 from pydantic import BaseModel, Field
 
 from src.carbon.query import (
@@ -36,13 +43,28 @@ from src.carbon.presentation import (
 )
 from src.forecast.forecast import ForecastEngine, ForecastResult
 from src.kpi.query import AnalyticsResult, KPIQueryEngine
-from src.qa.intent import IntentResult, classify_question
-from src.rag.retriever import QueryFilters, RAGRetriever
+from src.live_eta.aisstream import AISStreamCollector
+from src.query.context import ConversationStore
+from src.query.models import (
+    AnswerEnvelope,
+    AnswerState,
+    ExportRequest,
+    ExportResponse,
+    FeedbackRequest,
+    FeedbackResponse,
+    QueryFiltersPayload,
+    QueryRequest,
+)
+from src.query.planner import QueryPlanner
+from src.query.service import QueryService
+from src.rag.retriever import RAGRetriever
+from src.rag.synthesis import build_local_synthesizer
 from src.utils.ais_anomaly import detect_sudden_jump_events_from_parquet
 from src.utils.cloud_bootstrap import ensure_bundle, ensure_file_manifest
+from src.utils.confidence import extract_confidence_label
 from src.utils.config import load_config
 from src.utils.runtime import chroma_remote_settings, force_local_vector_env
-from src.utils.serialization import compact_traffic_evidence
+from src.utils.redaction import redact_sensitive_text
 
 
 class AskFiltersPayload(BaseModel):
@@ -50,12 +72,22 @@ class AskFiltersPayload(BaseModel):
     date_from: Optional[str] = None
     date_to: Optional[str] = None
     vessel_type: Optional[str] = None
+    vessel_name: Optional[str] = None
+    mmsi: Optional[str] = None
+    imo: Optional[str] = None
     anomaly: Optional[bool] = None
 
 
 class AskRequest(BaseModel):
     question: str = Field(..., min_length=1)
-    top_k_evidence: int = Field(default=5, ge=1, le=10)
+    top_k_evidence: int = Field(default=5, ge=0, le=10)
+    filters: AskFiltersPayload = Field(default_factory=AskFiltersPayload)
+
+
+class ChatRequest(BaseModel):
+    message: str = Field(..., min_length=1)
+    conversation_id: Optional[str] = None
+    top_k_evidence: int = Field(default=5, ge=0, le=10)
     filters: AskFiltersPayload = Field(default_factory=AskFiltersPayload)
 
 
@@ -71,6 +103,8 @@ class CarbonEstimateRequest(BaseModel):
     engine_family: Optional[str] = None
     boundary: str = "TTW"
     pollutants: Optional[List[str]] = None
+
+
 
 
 @dataclass
@@ -98,16 +132,17 @@ def _resolve_persist_dir(preferred_dir: Path) -> tuple[Path, bool]:
     return preferred_dir, False
 
 
-def _pick_filter(override: Optional[str], extracted: Optional[str]) -> Optional[str]:
-    if override is not None and str(override).strip():
-        return str(override).strip()
-    if extracted is not None and str(extracted).strip():
-        return str(extracted).strip()
-    return None
-
-
 def _load_runtime_setting(name: str) -> str:
     return str(os.getenv(name, "")).strip()
+
+
+def _runtime_flag(name: str, default: bool = False) -> bool:
+    raw = str(os.getenv(name, "")).strip().lower()
+    if not raw:
+        return default
+    return raw in {"1", "true", "yes", "on"}
+
+
 
 
 def _maybe_bootstrap_bundle(
@@ -165,110 +200,6 @@ def _init_retriever(
     return RAGRetriever(persist_dir=persist_dir, config_path=config_path)
 
 
-def _make_rag_filters(
-    entities: Dict[str, Any],
-    overrides: Dict[str, Any],
-    include_dates: bool = True,
-) -> QueryFilters:
-    port_token = _pick_filter(overrides.get("port"), entities.get("port"))
-    locode = None
-    destination = None
-    port_name = None
-    if port_token:
-        import re
-
-        if re.fullmatch(r"[A-Za-z]{2}\s?[A-Za-z]{3}", port_token):
-            locode = port_token
-        else:
-            destination = port_token
-            port_name = port_token
-
-    date_from = _pick_filter(overrides.get("date_from"), entities.get("date_from")) if include_dates else None
-    date_to = _pick_filter(overrides.get("date_to"), entities.get("date_to")) if include_dates else None
-
-    return QueryFilters(
-        mmsi=entities.get("mmsi"),
-        imo=entities.get("imo"),
-        locode=locode,
-        port_name=port_name,
-        destination=destination,
-        vessel_type=_pick_filter(overrides.get("vessel_type"), entities.get("vessel_type")),
-        date_from=date_from,
-        date_to=date_to,
-    )
-
-
-def _retrieve_evidence_api(
-    retriever: Optional[RAGRetriever],
-    retriever_reason: str,
-    question: str,
-    entities: Dict[str, Any],
-    overrides: Dict[str, Any],
-    top_k: int,
-    include_dates: bool,
-) -> EvidenceBundle:
-    if retriever is None:
-        return EvidenceBundle(
-            lines=[],
-            rows=[],
-            trace={
-                "retrieval_status": "disabled",
-                "reason": retriever_reason or "Retriever unavailable.",
-            },
-        )
-
-    import time
-
-    try:
-        filters = _make_rag_filters(entities=entities, overrides=overrides, include_dates=include_dates)
-        started = time.perf_counter()
-        result = retriever.query_traffic(question=question, filters=filters, top_k=top_k)
-        latency_ms = (time.perf_counter() - started) * 1000.0
-    except Exception as exc:
-        return EvidenceBundle(
-            lines=[],
-            rows=[],
-            trace={"retrieval_status": "error", "reason": f"Vector retrieval failed: {exc}"},
-        )
-
-    lines: List[str] = []
-    rows: List[Dict[str, Any]] = []
-    for item in result.evidence[:top_k]:
-        chunk_id = str(item.metadata.get("chunk_id") or item.metadata.get("stable_id") or item.metadata.get("id") or "")
-        dist_txt = f"{float(item.distance):.4f}" if item.distance is not None else "n/a"
-        lines.append(
-            f"vector_id={item.id} | chunk_id={chunk_id or 'n/a'} | dist={dist_txt} | "
-            f"{compact_traffic_evidence(item.metadata, item.text)}"
-        )
-        rows.append(
-            {
-                "vector_id": item.id,
-                "chunk_id": chunk_id or None,
-                "distance": item.distance,
-                "timestamp": item.metadata.get("timestamp_full") or item.metadata.get("date"),
-                "port": item.metadata.get("locode_norm")
-                or item.metadata.get("locode")
-                or item.metadata.get("port_name")
-                or item.metadata.get("destination_norm"),
-                "vessel_type": item.metadata.get("vessel_type_norm") or item.metadata.get("vessel_type"),
-                "mmsi": item.metadata.get("mmsi"),
-            }
-        )
-
-    trace = {
-        "retrieval_status": "ok" if rows else "no_hits",
-        "reason": "Vector rows retrieved successfully." if rows else "No vector rows matched the query and filters.",
-        "collection": retriever.config["index"]["traffic_collection"],
-        "mode": result.mode,
-        "vector_backend": getattr(retriever, "vector_backend", "unknown"),
-        "query_latency_ms": round(latency_ms, 2),
-        "returned_items": len(result.evidence),
-        "top_k_requested": top_k,
-        "where_filter": result.where_filter,
-    }
-    return EvidenceBundle(lines=lines, rows=rows, trace=trace)
-
-
 def _fallback_evidence_from_result(
     value: Union[AnalyticsResult, ForecastResult, CarbonResult],
     max_items: int = 5,
@@ -321,25 +252,6 @@ def _fallback_evidence_from_result(
             if parts:
                 lines.append(" | ".join(parts))
     return lines[:max_items]
-
-
-def _extract_confidence_label(value: Union[AnalyticsResult, ForecastResult, CarbonResult]) -> str:
-    if isinstance(value, CarbonResult):
-        if value.result_state in {CARBON_STATE_NOT_COMPUTABLE, CARBON_STATE_UNSUPPORTED}:
-            return "low / unavailable (deterministic carbon computation unavailable for this scope)"
-        if value.result_state == CARBON_STATE_RETRIEVAL_ONLY:
-            return "retrieval-only (supporting traffic evidence found, not numeric carbon source-of-truth)"
-        if value.result_state == CARBON_STATE_FORECAST_ONLY:
-            return "unavailable (carbon forecast requested but deterministic carbon forecast is not configured)"
-        return f"{value.confidence_label} ({value.confidence_reason})"
-    if value.status != "ok":
-        return "low (insufficient matched data/evidence)"
-    for note in value.caveats:
-        if note.lower().startswith("confidence:"):
-            return note.split(":", 1)[1].strip()
-    if isinstance(value, ForecastResult):
-        return "medium (forecast based on available historical patterns)"
-    return "medium (deterministic aggregation over filtered rows)"
 
 
 def _build_method_steps(value: Union[AnalyticsResult, ForecastResult, CarbonResult]) -> List[str]:
@@ -430,7 +342,7 @@ def _build_port_actions(value: Union[AnalyticsResult, ForecastResult, CarbonResu
         upper = float(value.forecast["upper"].mean()) if "upper" in value.forecast.columns else pred
         lower = float(value.forecast["lower"].mean()) if "lower" in value.forecast.columns else pred
         spread = max(0.0, upper - pred)
-        confidence = _extract_confidence_label(value).lower()
+        confidence = extract_confidence_label(value).lower()
         if pred >= 1.8:
             actions.append("Activate high-traffic playbook: reserve extra berth windows and pre-book pilot/tug shifts.")
             actions.append("Advance-notify terminal and gate teams to smooth truck and yard peaks.")
@@ -484,207 +396,6 @@ def _pick_chart(value: Union[AnalyticsResult, ForecastResult, CarbonResult]) -> 
     return None
 
 
-def _handle_ask_question_api(
-    question: str,
-    intent_result: IntentResult,
-    kpi: KPIQueryEngine,
-    forecaster: ForecastEngine,
-    carbon: CarbonQueryEngine,
-    retriever: Optional[RAGRetriever],
-    retriever_reason: str,
-    top_k_evidence: int,
-    user_filters: Dict[str, Any],
-    events_path: Optional[Path],
-) -> tuple[Union[AnalyticsResult, ForecastResult, CarbonResult], EvidenceBundle]:
-    entities = intent_result.entities
-    q_lower = question.lower()
-
-    port = _pick_filter(user_filters.get("port"), entities.get("port"))
-    start = _pick_filter(user_filters.get("date_from"), entities.get("date_from"))
-    end = _pick_filter(user_filters.get("date_to"), entities.get("date_to"))
-    vessel_type = _pick_filter(user_filters.get("vessel_type"), entities.get("vessel_type"))
-    dow = entities.get("dow")
-    target_date = entities.get("target_date")
-    window = entities.get("window")
-    metric = entities.get("metric", "arrivals_vessels")
-    aggregation = entities.get("aggregation")
-    mmsi = entities.get("mmsi")
-    horizon_weeks = int(entities.get("horizon_weeks") or 4)
-    ports: List[str] = [str(p).strip() for p in entities.get("ports") or [] if str(p).strip()]
-    if port and port not in ports:
-        ports.insert(0, port)
-
-    if intent_result.intent == "G":
-        return KPIQueryEngine.unsupported(
-            "This question needs terminal operations data (berth/crane/TEU/gate), which is not in PRJ912/PRJ896."
-        ), EvidenceBundle(lines=[], rows=[], trace={})
-
-    if intent_result.intent == "H":
-        result = carbon.from_question_entities(question=question, entities=entities, user_filters=user_filters)
-        evidence = _retrieve_evidence_api(
-            retriever,
-            retriever_reason,
-            question,
-            entities,
-            user_filters,
-            top_k_evidence,
-            True,
-        )
-        if isinstance(result, CarbonResult):
-            if result.result_state == CARBON_STATE_NOT_COMPUTABLE and evidence.rows:
-                result.result_state = CARBON_STATE_RETRIEVAL_ONLY
-                result.source_label = "Retrieved supporting traffic evidence only (no deterministic carbon computation)"
-                result.confidence_label = "low"
-                result.confidence_reason = (
-                    "Retrieval-only evidence is available; deterministic carbon inventory is not computable for this scope."
-                )
-                result.coverage_notes.append(
-                    "Traffic evidence was retrieved, but numeric carbon emissions could not be computed reliably."
-                )
-                result.diagnostics = dict(result.diagnostics or {})
-                result.diagnostics["result_state"] = CARBON_STATE_RETRIEVAL_ONLY
-                result.diagnostics["sanity_status"] = result.diagnostics.get("sanity_status", "warning")
-            elif result.status == "ok" and evidence.rows and result.result_state in {CARBON_STATE_COMPUTED, CARBON_STATE_COMPUTED_ZERO}:
-                result.source_label = "Hybrid (computed + retrieved supporting evidence)"
-        return result, evidence
-
-    if intent_result.intent == "A":
-        if aggregation == "peak_day":
-            result = kpi.get_peak_arrival_day(
-                port=port,
-                start=start,
-                end=end,
-                vessel_type=vessel_type,
-                window=window,
-            )
-        elif mmsi and any(token in q_lower for token in ("how long", "dwell", "in port", "port stay", "stayed")):
-            result = kpi.get_mmsi_port_stays(mmsi=str(mmsi), start=start, end=end, port=port)
-        elif "top" in q_lower and "port" in q_lower:
-            result = kpi.top_ports_by_arrivals(start=start, end=end, vessel_type=vessel_type, dow=dow)
-        elif "dwell" in q_lower:
-            result = kpi.get_avg_dwell_time(port=port, start=start, end=end, vessel_type=vessel_type, dow=dow)
-        elif "congestion" in q_lower:
-            result = kpi.get_congestion(port=port, start=start, end=end, dow=dow, window=window)
-        else:
-            result = kpi.get_arrivals(port=port, start=start, end=end, vessel_type=vessel_type, dow=dow, window=window)
-        evidence = _retrieve_evidence_api(retriever, retriever_reason, question, entities, user_filters, top_k_evidence, True)
-        return result, evidence
-
-    if intent_result.intent == "B":
-        if aggregation == "peak_day":
-            result = kpi.get_peak_arrival_day(
-                port=port,
-                start=start,
-                end=end,
-                vessel_type=vessel_type,
-                window=window,
-            )
-        elif entities.get("dow") and entities.get("dow_compare"):
-            result = kpi.compare_weekdays(
-                port=port,
-                start=start,
-                end=end,
-                day_a=entities["dow"],
-                day_b=entities["dow_compare"],
-                vessel_type=vessel_type,
-            )
-        elif "hour" in q_lower:
-            result = kpi.get_busiest_hour(port=port, start=start, end=end, vessel_type=vessel_type)
-        else:
-            result = kpi.get_busiest_dow(port=port, start=start, end=end, vessel_type=vessel_type)
-        evidence = _retrieve_evidence_api(retriever, retriever_reason, question, entities, user_filters, top_k_evidence, True)
-        return result, evidence
-
-    if intent_result.intent == "C":
-        if target_date:
-            result = forecaster.forecast_congestion_for_date(port=port or "", target_date=target_date, horizon_weeks=horizon_weeks)
-        else:
-            result = forecaster.forecast_congestion(port=port or "", target_dow=dow or "Friday", horizon_weeks=horizon_weeks)
-        evidence = _retrieve_evidence_api(retriever, retriever_reason, question, entities, user_filters, top_k_evidence, False)
-        return result, evidence
-
-    if intent_result.intent == "D":
-        result = kpi.compare_ports(ports=ports, metric=metric, start=start, end=end, vessel_type=vessel_type, dow=dow)
-        evidence = _retrieve_evidence_api(retriever, retriever_reason, question, entities, user_filters, top_k_evidence, True)
-        return result, evidence
-
-    if intent_result.intent == "E":
-        target = start or end
-        result = kpi.diagnose_congestion(port=port, target_date=target)
-        evidence = _retrieve_evidence_api(retriever, retriever_reason, question, entities, user_filters, top_k_evidence, True)
-        return result, evidence
-
-    if intent_result.intent == "F":
-        if any(token in q_lower for token in ("jump", "spoof", "teleport", "impossible")):
-            filters = _make_rag_filters(entities=entities, overrides=user_filters, include_dates=True)
-            jump_result: Dict[str, Any]
-            if retriever is not None:
-                jump_result = retriever.detect_sudden_jumps(filters=filters)
-            elif events_path and events_path.exists():
-                jump_result = detect_sudden_jump_events_from_parquet(
-                    events_path=events_path,
-                    mmsi=filters.mmsi,
-                    date_from=filters.date_from,
-                    date_to=filters.date_to,
-                )
-            else:
-                return AnalyticsResult(
-                    status="no_data",
-                    answer="I don't have row-level AIS evidence in the current runtime to verify jump anomalies.",
-                    table=None,
-                    chart=None,
-                    coverage_notes=[],
-                    caveats=[
-                        "This query needs either a working vector retriever or events.parquet in the runtime.",
-                        "Configure remote Chroma or APP_EVENTS_BUNDLE_URL for event-level anomaly detection.",
-                    ],
-                ), EvidenceBundle(lines=[], rows=[], trace={})
-
-            count = int(jump_result.get("count", 0))
-            events = pd.DataFrame(jump_result.get("events") or [])
-            chart = None
-            table = None
-            if not events.empty:
-                table_cols = [
-                    c for c in [
-                        "mmsi", "timestamp_full", "distance_km", "dt_minutes",
-                        "latitude", "longitude", "prev_latitude", "prev_longitude", "port", "stable_id"
-                    ] if c in events.columns
-                ]
-                table = events[table_cols].copy()
-                if {"timestamp_full", "distance_km"}.issubset(events.columns):
-                    chart = (
-                        events.assign(timestamp_dt=pd.to_datetime(events["timestamp_full"], errors="coerce", utc=True))
-                        .dropna(subset=["timestamp_dt"])
-                        .sort_values("timestamp_dt")
-                        .set_index("timestamp_dt")[["distance_km"]]
-                    )
-            result = AnalyticsResult(
-                status="ok",
-                answer=f"Detected {count} potential sudden AIS coordinate jumps in the filtered range.",
-                table=table,
-                chart=chart,
-                coverage_notes=[
-                    f"Rows used: {count}",
-                    "Data sources used: AIS metadata index" if retriever is not None else "Data sources used: row-level AIS events parquet",
-                ],
-                caveats=[
-                    "Jump rule: coordinate displacement above threshold within 30 minutes.",
-                    "This is a heuristic anomaly indicator, not proof of spoofing.",
-                ],
-            )
-            evidence = _retrieve_evidence_api(retriever, retriever_reason, question, entities, user_filters, top_k_evidence, True)
-            return result, evidence
-
-        result = kpi.detect_arrival_spikes(port=port, start=start, end=end)
-        evidence = _retrieve_evidence_api(retriever, retriever_reason, question, entities, user_filters, top_k_evidence, True)
-        return result, evidence
-
-    result = kpi.get_arrivals(port=port, start=start, end=end, vessel_type=vessel_type, dow=dow, window=window)
-    evidence = _retrieve_evidence_api(retriever, retriever_reason, question, entities, user_filters, top_k_evidence, True)
-    return result, evidence
-
-
 def _serialize_result(
     result: Union[AnalyticsResult, ForecastResult, CarbonResult],
     evidence: EvidenceBundle,
@@ -693,7 +404,7 @@ def _serialize_result(
     payload: Dict[str, Any] = {
         "status": result.status,
         "answer": result.answer,
-        "confidence": _extract_confidence_label(result),
+        "confidence": extract_confidence_label(result),
         "coverage_notes": result.coverage_notes,
         "caveats": result.caveats,
         "method_steps": _build_method_steps(result),
@@ -781,7 +492,7 @@ def _serialize_result(
 
         metrics = compute_emissions_metrics(result.table, result.boundary)
         total = float(metrics.get("total_tco2e") or 0.0)
-        table_metric_col = "wtw_co2e_t" if result.boundary == "WTW" else "ttw_co2e_t"
+        table_metric_col = "wtw_co2e_t" if result.boundary in {"WTW", "TTW_WTW"} else "ttw_co2e_t"
         if result.table is not None and table_metric_col not in result.table.columns:
             table_metric_col = "co2_t" if "co2_t" in result.table.columns else table_metric_col
         hist_values = (
@@ -915,55 +626,146 @@ def _build_state() -> Dict[str, Any]:
     else:
         persist_dir, using_demo_chroma = _resolve_persist_dir(configured_persist_dir)
 
-    kpi_engine = KPIQueryEngine(processed_dir=processed_dir)
+    # Materialize deterministic tables before the service is shared across
+    # worker threads. This bounds first-query latency and prevents lazy native
+    # PyArrow reads during Streamlit reruns.
+    kpi_engine = KPIQueryEngine(processed_dir=processed_dir).preload()
     forecast_engine = ForecastEngine(processed_dir=processed_dir)
+    forecast_engine.kpi = kpi_engine
     carbon_engine = CarbonQueryEngine(
         processed_dir=processed_dir,
         factor_registry_path=carbon_cfg.get("factor_registry_path", "config/carbon_factors.v1.json"),
         monte_carlo_draws=int(carbon_cfg.get("monte_carlo_draws", 500)),
         auto_build=True,
-    )
+    ).preload()
 
     retriever = None
     retriever_reason = ""
-    api_key = _load_runtime_setting("OPENAI_API_KEY")
+    enable_model_responses = _runtime_flag("EAGLE_EYE_ENABLE_MODEL_RESPONSES", default=False)
+    api_key = _load_runtime_setting("OPENAI_API_KEY") if enable_model_responses else ""
+    chat_openai: Optional[OpenAI] = None
     if api_key:
         os.environ["OPENAI_API_KEY"] = api_key
         try:
-            retriever = _init_retriever(persist_dir=persist_dir, config_path=config_path)
-            retriever_reason = f"Retriever active (backend: {retriever.vector_backend})."
-        except Exception as exc:
-            retriever_reason = f"Retriever init failed: {exc}"
-            if using_remote_vector:
-                chroma_bootstrap_changed, chroma_bootstrap_message = _maybe_bootstrap_chroma_runtime(
-                    configured_persist_dir
-                )
-                fallback_persist_dir, fallback_using_demo_chroma = _resolve_persist_dir(configured_persist_dir)
-                if (fallback_persist_dir / "chroma.sqlite3").exists():
-                    try:
-                        retriever = _init_retriever(
-                            persist_dir=fallback_persist_dir,
-                            config_path=config_path,
-                            force_local_vector=True,
-                        )
-                        persist_dir = fallback_persist_dir
-                        using_demo_chroma = fallback_using_demo_chroma
-                        retriever_reason = (
-                            f"Remote retriever failed ({exc}). "
-                            f"Fell back to local vector store at {fallback_persist_dir} "
-                            f"(backend: {retriever.vector_backend})."
-                        )
-                    except Exception as local_exc:
-                        retriever_reason = (
-                            f"Remote retriever failed ({exc}); local fallback failed ({local_exc})."
-                        )
-    else:
-        retriever_reason = "Retriever unavailable: OPENAI_API_KEY not set."
+            chat_openai = OpenAI(api_key=api_key)
+        except Exception:
+            chat_openai = None
+    try:
+        retriever = _init_retriever(persist_dir=persist_dir, config_path=config_path)
+        retriever_reason = (
+            f"Retriever active (vector backend: {retriever.vector_backend}; "
+            f"query backend: {retriever.query_backend})."
+        )
+    except Exception as exc:
+        retriever_reason = redact_sensitive_text(f"Retriever init failed: {exc}")
+        if using_remote_vector:
+            chroma_bootstrap_changed, chroma_bootstrap_message = _maybe_bootstrap_chroma_runtime(
+                configured_persist_dir
+            )
+            fallback_persist_dir, fallback_using_demo_chroma = _resolve_persist_dir(
+                configured_persist_dir
+            )
+            if (fallback_persist_dir / "chroma.sqlite3").exists():
+                try:
+                    retriever = _init_retriever(
+                        persist_dir=fallback_persist_dir,
+                        config_path=config_path,
+                        force_local_vector=True,
+                    )
+                    persist_dir = fallback_persist_dir
+                    using_demo_chroma = fallback_using_demo_chroma
+                    retriever_reason = (
+                        f"Remote retriever failed ({redact_sensitive_text(exc)}). "
+                        f"Fell back to local vector store at {fallback_persist_dir} "
+                        f"(vector backend: {retriever.vector_backend}; "
+                        f"query backend: {retriever.query_backend})."
+                    )
+                except Exception as local_exc:
+                    retriever_reason = redact_sensitive_text(
+                        f"Remote retriever failed ({exc}); local fallback failed ({local_exc})."
+                    )
+
+    try:
+        local_synthesizer = build_local_synthesizer(config)
+        local_synthesizer_reason = (
+            f"Configured {local_synthesizer.provider}/{local_synthesizer.model}."
+            if local_synthesizer is not None
+            else "Local synthesis disabled."
+        )
+    except Exception as exc:
+        local_synthesizer = None
+        local_synthesizer_reason = redact_sensitive_text(
+            f"Local synthesis configuration failed: {exc}"
+        )
 
     events_path = configured_processed_dir / "events.parquet"
     if not events_path.exists():
         events_path = processed_dir / "events.parquet"
-
+    chat_max_turns = int(config.get("chat", {}).get("max_history_turns", 8))
+    model_cfg = config.get("models", {})
+    planner_model = _load_runtime_setting("EAGLE_EYE_PLANNER_MODEL") or str(
+        model_cfg.get("planner_model", "gpt-5.6-terra")
+    )
+    general_model = _load_runtime_setting("EAGLE_EYE_GENERAL_MODEL") or str(
+        model_cfg.get("general_model", planner_model)
+    )
+    research_model = _load_runtime_setting("EAGLE_EYE_RESEARCH_MODEL") or str(
+        model_cfg.get("research_model", "gpt-5.6-sol")
+    )
+    reasoning_effort = _load_runtime_setting("EAGLE_EYE_REASONING_EFFORT") or "medium"
+    sqlite_path = Path(
+        _load_runtime_setting("EAGLE_EYE_SQLITE_PATH") or "data/runtime/eagle_eye.sqlite3"
+    )
+    conversation_store = ConversationStore(sqlite_path, max_history_turns=chat_max_turns)
+    # ETA Watch uses one backend-only AISStream collector. The legacy
+    # Fintraffic adapter remains importable for stored-result compatibility
+    # and its focused tests, but it is not a public runtime source.
+    aisstream_enabled = _runtime_flag("EAGLE_EYE_AISSTREAM_ENABLED", default=True)
+    aisstream_collector: Optional[AISStreamCollector] = None
+    if aisstream_enabled:
+        try:
+            aisstream_collector = AISStreamCollector(
+                sqlite_path=Path(
+                    _load_runtime_setting("EAGLE_EYE_AISSTREAM_SQLITE_PATH")
+                    or "data/runtime/aisstream.sqlite3"
+                ),
+                api_key=_load_runtime_setting("AISSTREAM_API_KEY"),
+                history_hours=int(
+                    _load_runtime_setting("EAGLE_EYE_AISSTREAM_HISTORY_HOURS")
+                    or "24"
+                ),
+                stale_after_minutes=int(
+                    _load_runtime_setting("EAGLE_EYE_AISSTREAM_MAX_AGE_MINUTES")
+                    or "10"
+                ),
+            )
+        except (TypeError, ValueError):
+            aisstream_collector = None
+    planner = QueryPlanner(
+        openai_client=chat_openai,
+        model=planner_model,
+        reasoning_effort=reasoning_effort,
+        enable_openai=enable_model_responses,
+    )
+    query_service = QueryService(
+        kpi=kpi_engine,
+        forecaster=forecast_engine,
+        carbon=carbon_engine,
+        conversation_store=conversation_store,
+        retriever=retriever,
+        retriever_reason=retriever_reason,
+        events_path=events_path,
+        planner=planner,
+        openai_client=chat_openai,
+        general_model=general_model,
+        research_model=research_model,
+        reasoning_effort=reasoning_effort,
+        enable_model_responses=enable_model_responses,
+        local_synthesizer=local_synthesizer,
+        live_eta=aisstream_collector,
+        export_dir=_load_runtime_setting("EAGLE_EYE_EXPORT_DIR") or "data/exports",
+        processed_dir=processed_dir,
+    )
     return {
         "config_path": config_path,
         "threshold_percentiles": threshold_percentiles,
@@ -980,16 +782,52 @@ def _build_state() -> Dict[str, Any]:
         "carbon": carbon_engine,
         "retriever": retriever,
         "retriever_reason": retriever_reason,
+        "retrieval_backend": retriever.retrieval_backend if retriever else None,
+        "local_synthesizer": local_synthesizer,
+        "local_synthesizer_reason": local_synthesizer_reason,
         "events_path": str(events_path),
+        "query_service": query_service,
+        "conversation_store": conversation_store,
+        "aisstream_collector": aisstream_collector,
+        "aisstream_enabled": aisstream_enabled,
+        "fintraffic_adapter": None,
+        "fintraffic_enabled": False,
+        "planner_model": planner_model,
+        "general_model": general_model,
+        "research_model": research_model,
+        "reasoning_effort": reasoning_effort,
+        "model_responses_enabled": enable_model_responses,
+        "chat_max_turns": chat_max_turns,
     }
 
 
-app = FastAPI(title="Eagle Eye API", version="1.0.0")
+@asynccontextmanager
+async def _lifespan(application: FastAPI):
+    runtime = _build_state()
+    application.state.runtime = runtime
+    collector = runtime.get("aisstream_collector")
+    collector_task: Optional[asyncio.Task[Any]] = None
+    if isinstance(collector, AISStreamCollector):
+        capabilities = collector.capabilities()
+        if capabilities.get("api_key_configured"):
+            collector_task = asyncio.create_task(
+                collector.run(),
+                name="eagle-eye-aisstream-collector",
+            )
+            runtime["aisstream_task"] = collector_task
+    try:
+        yield
+    finally:
+        if isinstance(collector, AISStreamCollector):
+            await collector.stop()
+        if collector_task is not None and not collector_task.done():
+            collector_task.cancel()
+        if collector_task is not None:
+            with suppress(asyncio.CancelledError):
+                await collector_task
 
 
-@app.on_event("startup")
-def _startup() -> None:
-    app.state.runtime = _build_state()
+app = FastAPI(title="Eagle Eye API", version="2.0.0", lifespan=_lifespan)
 
 
 def _runtime_state() -> Dict[str, Any]:
@@ -998,6 +836,47 @@ def _runtime_state() -> Dict[str, Any]:
         runtime = _build_state()
         app.state.runtime = runtime
     return runtime
+
+
+def _web_dist_dir() -> Path:
+    return Path(__file__).resolve().parents[2] / "web" / "dist"
+
+
+def _compat_result(envelope: AnswerEnvelope) -> Dict[str, Any]:
+    status = (
+        "ok"
+        if envelope.state in {AnswerState.COMPUTED, AnswerState.PARTIAL}
+        else "unsupported"
+        if envelope.state == AnswerState.UNSUPPORTED
+        else "no_data"
+    )
+    chart_dataset = next((item for item in envelope.datasets if item.id == "chart"), None)
+    caveats = list(envelope.caveats)
+    if status != "ok" and envelope.answer not in caveats:
+        caveats.append(envelope.answer)
+    return {
+        "status": status,
+        "answer": envelope.answer,
+        "confidence": envelope.confidence,
+        "coverage_notes": [envelope.freshness.message],
+        "caveats": caveats,
+        "method_steps": [
+            f"Canonical route: {envelope.mode.value}.",
+            f"Canonical operation: {envelope.plan.operation.value}.",
+        ],
+        "recommendations": [],
+        "evidence": {
+            "computed": [fact.model_dump(mode="json") for fact in envelope.facts],
+            "retrieved_lines": [item.excerpt for item in envelope.evidence if item.excerpt],
+            "retrieved_rows": [item.model_dump(mode="json") for item in envelope.evidence],
+        },
+        "chart": chart_dataset.rows if chart_dataset else None,
+        "retrieval_provenance": {
+            "trace_id": envelope.trace.trace_id,
+            "planner_source": envelope.trace.planner_source,
+        },
+        "canonical": envelope.model_dump(mode="json"),
+    }
 
 
 @app.get("/health")
@@ -1014,19 +893,40 @@ def health() -> Dict[str, Any]:
         "chroma_bootstrap_changed": state["chroma_bootstrap_changed"],
         "chroma_bootstrap_message": state["chroma_bootstrap_message"],
         "retriever_reason": state["retriever_reason"],
+        "retrieval_backend": state["retrieval_backend"],
+        "local_synthesizer_reason": state["local_synthesizer_reason"],
         "events_available": bool(Path(state["events_path"]).exists()),
         "carbon_available": bool(state["carbon"].available),
         "carbon_params_version": state["carbon"].params_version.get("version"),
+        "planner_model": state["planner_model"],
+        "general_model": state["general_model"],
+        "research_model": state["research_model"],
+        "reasoning_effort": state["reasoning_effort"],
+        "model_responses_enabled": state["model_responses_enabled"],
+        "conversation_store": "sqlite",
+        "conversation_count": state["conversation_store"].count_conversations(),
+        "fintraffic_enabled": state.get("fintraffic_enabled", False),
+        "fintraffic_available": state.get("fintraffic_adapter") is not None,
     }
 
 
 @app.get("/")
-def root() -> Dict[str, Any]:
+def root() -> Any:
+    index = _web_dist_dir() / "index.html"
+    if index.exists():
+        return FileResponse(index)
+    state = _runtime_state()
     return {
         "name": "Eagle Eye API",
         "docs": "/docs",
         "health": "/health",
+        "query_v2": "/api/v2/query",
+        "query_stream_v2": "/api/v2/query/stream",
+        "capabilities_v2": "/api/v2/capabilities",
+        "exports_v2": "/api/v2/exports",
+        "feedback_v2": "/api/v2/feedback",
         "ask": "/ask",
+        "chat": "/api/v1/chat",
         "carbon_ports": "/api/v1/carbon/ports/{port_id}/emissions",
         "carbon_call": "/api/v1/carbon/vessels/{mmsi}/calls/{call_id}",
         "carbon_estimate": "/api/v1/carbon/estimate",
@@ -1037,26 +937,101 @@ def root() -> Dict[str, Any]:
 @app.post("/ask")
 def ask(req: AskRequest) -> Dict[str, Any]:
     state = _runtime_state()
-    question = req.question.strip()
-    intent_result = classify_question(question)
-    user_filters = req.filters.model_dump()
-    result, evidence = _handle_ask_question_api(
-        question=question,
-        intent_result=intent_result,
-        kpi=state["kpi"],
-        forecaster=state["forecast"],
-        carbon=state["carbon"],
-        retriever=state["retriever"],
-        retriever_reason=state["retriever_reason"],
-        top_k_evidence=req.top_k_evidence,
-        user_filters=user_filters,
-        events_path=Path(state["events_path"]) if Path(state["events_path"]).exists() else None,
+    envelope = state["query_service"].query(
+        QueryRequest(
+            question=req.question,
+            top_k_evidence=req.top_k_evidence,
+            filters=QueryFiltersPayload.model_validate(req.filters.model_dump()),
+        )
     )
     return {
-        "question": question,
-        "intent": asdict(intent_result),
-        "result": _serialize_result(result, evidence, threshold_percentiles=state["threshold_percentiles"]),
+        "question": envelope.question,
+        "intent": envelope.plan.model_dump(mode="json"),
+        "result": _compat_result(envelope),
     }
+
+
+@app.post("/api/v1/chat")
+def chat(req: ChatRequest) -> Dict[str, Any]:
+    state = _runtime_state()
+    envelope = state["query_service"].query(
+        QueryRequest(
+            question=req.message,
+            conversation_id=req.conversation_id,
+            top_k_evidence=req.top_k_evidence,
+            filters=QueryFiltersPayload.model_validate(req.filters.model_dump()),
+        )
+    )
+    return {
+        "conversation_id": envelope.conversation_id,
+        "turn_id": envelope.turn_id,
+        "message": envelope.question,
+        "answer": envelope.answer,
+        "result_state": envelope.state.value,
+        "source_type": "Computed" if envelope.state in {AnswerState.COMPUTED, AnswerState.PARTIAL} else "Retrieved" if envelope.state == AnswerState.RETRIEVED else "System",
+        "confidence": envelope.confidence,
+        "assumptions_used": envelope.caveats,
+        "evidence": {
+            "lines": [item.excerpt for item in envelope.evidence if item.excerpt],
+            "rows": [item.model_dump(mode="json") for item in envelope.evidence],
+        },
+        "tool_trace": envelope.trace.model_dump(mode="json"),
+        "intent": envelope.plan.model_dump(mode="json"),
+        "deterministic_result": _compat_result(envelope),
+    }
+
+
+@app.post("/api/v2/query", response_model=AnswerEnvelope)
+def query_v2(req: QueryRequest) -> AnswerEnvelope:
+    return _runtime_state()["query_service"].query(req)
+
+
+@app.post("/api/v2/query/stream")
+def query_stream_v2(req: QueryRequest) -> StreamingResponse:
+    def events():
+        yield "event: progress\ndata: " + json.dumps({"stage": "accepted"}) + "\n\n"
+        yield "event: progress\ndata: " + json.dumps({"stage": "executing"}) + "\n\n"
+        envelope = _runtime_state()["query_service"].query(req)
+        yield "event: text\ndata: " + json.dumps({"delta": envelope.answer}) + "\n\n"
+        yield "event: final\ndata: " + envelope.model_dump_json() + "\n\n"
+
+    return StreamingResponse(
+        events(),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+    )
+
+
+@app.get("/api/v2/capabilities")
+def capabilities_v2() -> Dict[str, Any]:
+    return _runtime_state()["query_service"].capabilities()
+
+
+@app.post("/api/v2/exports", response_model=ExportResponse)
+def exports_v2(req: ExportRequest) -> ExportResponse:
+    try:
+        return _runtime_state()["query_service"].export(req)
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail=redact_sensitive_text(exc)) from exc
+
+
+@app.post("/api/v2/feedback", response_model=FeedbackResponse, status_code=202)
+def feedback_v2(req: FeedbackRequest) -> FeedbackResponse:
+    return _runtime_state()["query_service"].submit_feedback(req)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 def _parse_pollutants_query(value: Optional[str]) -> List[str]:
@@ -1149,3 +1124,35 @@ def carbon_evidence(evidence_id: str) -> Dict[str, Any]:
     if payload.get("status") != "ok":
         raise HTTPException(status_code=404, detail=payload.get("reason", "Evidence not found"))
     return payload
+
+
+# Register the commercial build only after every API/documentation route so an
+# SPA fallback can never mask an API 404 or intercept OpenAPI.
+_DIST_DIR = _web_dist_dir()
+if (_DIST_DIR / "assets").is_dir():
+    app.mount("/assets", StaticFiles(directory=_DIST_DIR / "assets"), name="web-assets")
+
+
+@app.api_route(
+    "/{full_path:path}",
+    methods=["GET", "HEAD", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    include_in_schema=False,
+)
+def web_spa_fallback(full_path: str) -> Any:
+    first_segment = full_path.split("/", 1)[0].lower()
+    if first_segment in {"api", "docs", "redoc", "health", "openapi.json"}:
+        raise HTTPException(status_code=404, detail="Not found")
+    dist = _web_dist_dir().resolve()
+    if not dist.is_dir():
+        raise HTTPException(status_code=404, detail="Commercial web build is not installed")
+    candidate = (dist / full_path).resolve()
+    try:
+        candidate.relative_to(dist)
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail="Not found") from exc
+    if candidate.is_file():
+        return FileResponse(candidate)
+    index = dist / "index.html"
+    if index.is_file():
+        return FileResponse(index)
+    raise HTTPException(status_code=404, detail="Commercial web build is incomplete")

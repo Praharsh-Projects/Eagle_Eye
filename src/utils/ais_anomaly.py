@@ -7,7 +7,56 @@ from typing import Any, Dict, List, Optional
 
 import pandas as pd
 
+from src.utils.parquet_io import read_parquet_safely
+
 from src.utils.serialization import normalize_identifier
+
+
+_MISSING_PORT_TOKENS = {"", "NA", "NAN", "NONE", "NULL", "UNK", "UNKNOWN"}
+
+
+def _normalize_locode(value: Any) -> str:
+    if value is None:
+        return ""
+    try:
+        if pd.isna(value):
+            return ""
+    except (TypeError, ValueError):
+        pass
+    token = "".join(ch for ch in str(value).strip().upper() if ch.isalnum())
+    return "" if token in _MISSING_PORT_TOKENS else token
+
+
+def _apply_observed_port_scope(
+    frame: pd.DataFrame,
+    locode: Optional[str],
+) -> tuple[pd.DataFrame, Optional[str], Optional[str]]:
+    """Apply only an observed row-level port code, never a destination proxy.
+
+    Returns ``(filtered, field_used, error)``. A requested scope without a
+    populated observed port/LOCODE column is rejected explicitly.
+    """
+
+    requested = _normalize_locode(locode)
+    if not requested:
+        return frame, None, None
+
+    for field in ("locode_norm", "locode", "port_key"):
+        if field not in frame.columns:
+            continue
+        normalized = frame[field].map(_normalize_locode)
+        if not normalized.ne("").any():
+            continue
+        return frame[normalized == requested].copy(), field, None
+
+    return (
+        frame.iloc[0:0].copy(),
+        None,
+        (
+            f"AIS position rows do not contain a populated observed port/LOCODE field for {requested}. "
+            "Destination text cannot establish an observed port location."
+        ),
+    )
 
 
 def _safe_float(value: Any) -> Optional[float]:
@@ -40,6 +89,7 @@ def _first_present(*values: Any) -> Optional[str]:
 def detect_sudden_jump_events_from_parquet(
     events_path: str | Path,
     mmsi: Optional[str] = None,
+    locode: Optional[str] = None,
     date_from: Optional[str] = None,
     date_to: Optional[str] = None,
     max_minutes: int = 30,
@@ -52,13 +102,29 @@ def detect_sudden_jump_events_from_parquet(
     if not path.exists():
         return {"count": 0, "events": [], "reason": f"Events file missing: {path}"}
 
-    df = pd.read_parquet(path)
+    df = read_parquet_safely(path)
     if df.empty:
         return {"count": 0, "events": [], "reason": "Events parquet is empty."}
 
     work = df.copy()
     if "event_kind" in work.columns:
         work = work[work["event_kind"].astype(str) == "ais_position"]
+    work, port_scope_field, port_scope_error = _apply_observed_port_scope(work, locode)
+    if port_scope_error:
+        return {
+            "count": 0,
+            "events": [],
+            "reason": port_scope_error,
+            "scope_status": "unsupported",
+            "scope_applied": False,
+            "requested_locode": _normalize_locode(locode),
+        }
+    scope_metadata = {
+        "scope_status": "applied" if port_scope_field else "not_requested",
+        "scope_applied": bool(port_scope_field),
+        "scope_field": port_scope_field,
+        "requested_locode": _normalize_locode(locode) or None,
+    }
     if "mmsi" in work.columns:
         work["mmsi"] = work["mmsi"].astype(str).map(normalize_identifier)
     if mmsi and "mmsi" in work.columns:
@@ -66,7 +132,12 @@ def detect_sudden_jump_events_from_parquet(
 
     timestamp_source = "timestamp_full" if "timestamp_full" in work.columns else "timestamp"
     if timestamp_source not in work.columns:
-        return {"count": 0, "events": [], "reason": "No timestamp column available for jump detection."}
+        return {
+            "count": 0,
+            "events": [],
+            "reason": "No timestamp column available for jump detection.",
+            **scope_metadata,
+        }
 
     work["timestamp_dt"] = pd.to_datetime(work[timestamp_source], errors="coerce", utc=True)
     if date_from:
@@ -75,7 +146,12 @@ def detect_sudden_jump_events_from_parquet(
         work = work[work["timestamp_dt"] <= pd.Timestamp(date_to, tz="UTC") + pd.Timedelta(days=1) - pd.Timedelta(seconds=1)]
 
     if "latitude" not in work.columns or "longitude" not in work.columns:
-        return {"count": 0, "events": [], "reason": "Latitude/longitude columns missing from events parquet."}
+        return {
+            "count": 0,
+            "events": [],
+            "reason": "Latitude/longitude columns missing from events parquet.",
+            **scope_metadata,
+        }
 
     work["latitude"] = pd.to_numeric(work["latitude"], errors="coerce")
     work["longitude"] = pd.to_numeric(work["longitude"], errors="coerce")
@@ -84,7 +160,12 @@ def detect_sudden_jump_events_from_parquet(
         work["mmsi"] = None
     work = work.dropna(subset=["mmsi"])
     if work.empty:
-        return {"count": 0, "events": [], "reason": "No AIS points available after filtering."}
+        return {
+            "count": 0,
+            "events": [],
+            "reason": "No AIS points available after filtering.",
+            **scope_metadata,
+        }
 
     work = work.sort_values(["mmsi", "timestamp_dt"])
     events: List[Dict[str, Any]] = []
@@ -152,4 +233,9 @@ def detect_sudden_jump_events_from_parquet(
         if len(events) >= limit:
             break
 
-    return {"count": len(events), "events": events, "reason": "Computed from row-level AIS events parquet."}
+    return {
+        "count": len(events),
+        "events": events,
+        "reason": "Computed from row-level AIS events parquet.",
+        **scope_metadata,
+    }

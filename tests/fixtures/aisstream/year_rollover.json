@@ -1,0 +1,27 @@
+{
+  "MessageType": "ShipStaticData",
+  "MetaData": {
+    "MMSI": 265555000,
+    "ShipName": "NEW YEAR VOYAGER",
+    "latitude": 59.0,
+    "longitude": 20.0,
+    "time_utc": "2026-12-31 23:55:00.000000 +0000 UTC"
+  },
+  "Message": {
+    "ShipStaticData": {
+      "CallSign": "SNYV",
+      "Destination": "TALLINN",
+      "Eta": {
+        "Day": 1,
+        "Hour": 1,
+        "Minute": 0,
+        "Month": 1
+      },
+      "ImoNumber": 9755555,
+      "Name": "NEW YEAR VOYAGER",
+      "Type": 70,
+      "UserID": 265555000,
+      "Valid": true
+    }
+  }
+}

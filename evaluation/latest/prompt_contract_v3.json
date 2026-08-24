@@ -1,0 +1,3465 @@
+{
+  "schema_version": "3.0",
+  "generated_at": "2026-07-22T13:04:53.706649+00:00",
+  "case_count": 75,
+  "normalization": "Unicode casefold plus collapsed whitespace",
+  "numeric_oracle": "Derived independently from data/processed/arrivals_daily.parquet; legacy answers are provenance only.",
+  "cases": [
+    {
+      "case_id": "pcv3_001",
+      "prompt": "How many vessel arrivals were recorded at SEGOT in March 2022?",
+      "normalized_prompt": "how many vessel arrivals were recorded at segot in march 2022?",
+      "source_tags": [
+        "catalog:traffic_monitoring",
+        "legacy:traffic_monitoring",
+        "ui:traffic_monitoring"
+      ],
+      "source_expectations": [
+        "COMPUTED",
+        "ok"
+      ],
+      "expectations": {
+        "intents": [
+          "A"
+        ],
+        "metric": "arrivals_vessels",
+        "entities": {
+          "ports": [
+            "SEGOT"
+          ],
+          "mmsi": null,
+          "call_id": null,
+          "vessel_type": null,
+          "dow": null,
+          "dow_compare": null,
+          "aggregation": null
+        },
+        "dates": {
+          "mode": "absolute",
+          "date_from": "2022-03-01",
+          "date_to": "2022-03-31",
+          "target_date": null
+        },
+        "result_states": [
+          "COMPUTED"
+        ],
+        "coverage": "complete",
+        "boundary": null,
+        "required_values": [
+          {
+            "name": "arrival_count",
+            "value": 488,
+            "tolerance": 0
+          },
+          {
+            "name": "day_buckets",
+            "value": 31,
+            "tolerance": 0
+          }
+        ],
+        "required_terms": [],
+        "forbidden_claims": [],
+        "forbid_numeric_answer": false
+      }
+    },
+    {
+      "case_id": "pcv3_002",
+      "prompt": "How many vessel arrivals were recorded at Karlshamn and Karlskrona in March 2022?",
+      "normalized_prompt": "how many vessel arrivals were recorded at karlshamn and karlskrona in march 2022?",
+      "source_tags": [
+        "ui:traffic_monitoring"
+      ],
+      "source_expectations": [],
+      "expectations": {
+        "intents": [
+          "A"
+        ],
+        "metric": "arrivals_vessels",
+        "entities": {
+          "ports": [
+            "SEKAN",
+            "SEKAA"
+          ],
+          "mmsi": null,
+          "call_id": null,
+          "vessel_type": null,
+          "dow": null,
+          "dow_compare": null,
+          "aggregation": null
+        },
+        "dates": {
+          "mode": "absolute",
+          "date_from": "2022-03-01",
+          "date_to": "2022-03-31",
+          "target_date": null
+        },
+        "result_states": [
+          "COMPUTED"
+        ],
+        "coverage": "partial",
+        "boundary": null,
+        "required_values": [],
+        "required_terms": [
+          "partial coverage"
+        ],
+        "forbidden_claims": [],
+        "forbid_numeric_answer": false
+      }
+    },
+    {
+      "case_id": "pcv3_003",
+      "prompt": "What is the first arrival seen at Karlshamn on 2022-03-22?",
+      "normalized_prompt": "what is the first arrival seen at karlshamn on 2022-03-22?",
+      "source_tags": [
+        "ui:traffic_monitoring"
+      ],
+      "source_expectations": [],
+      "expectations": {
+        "intents": [
+          "A"
+        ],
+        "metric": "arrivals_vessels",
+        "entities": {
+          "ports": [
+            "SEKAN"
+          ],
+          "mmsi": null,
+          "call_id": null,
+          "vessel_type": null,
+          "dow": null,
+          "dow_compare": null,
+          "aggregation": "first_arrival"
+        },
+        "dates": {
+          "mode": "absolute",
+          "date_from": "2022-03-22",
+          "date_to": "2022-03-22",
+          "target_date": "2022-03-22"
+        },
+        "result_states": [
+          "COMPUTED"
+        ],
+        "coverage": "complete",
+        "boundary": null,
+        "required_values": [],
+        "required_terms": [],
+        "forbidden_claims": [],
+        "forbid_numeric_answer": false
+      }
+    },
+    {
+      "case_id": "pcv3_004",
+      "prompt": "What is the last arrival seen at Karlshamn on 2022-03-22?",
+      "normalized_prompt": "what is the last arrival seen at karlshamn on 2022-03-22?",
+      "source_tags": [
+        "ui:traffic_monitoring"
+      ],
+      "source_expectations": [],
+      "expectations": {
+        "intents": [
+          "A"
+        ],
+        "metric": "arrivals_vessels",
+        "entities": {
+          "ports": [
+            "SEKAN"
+          ],
+          "mmsi": null,
+          "call_id": null,
+          "vessel_type": null,
+          "dow": null,
+          "dow_compare": null,
+          "aggregation": "last_arrival"
+        },
+        "dates": {
+          "mode": "absolute",
+          "date_from": "2022-03-22",
+          "date_to": "2022-03-22",
+          "target_date": "2022-03-22"
+        },
+        "result_states": [
+          "COMPUTED"
+        ],
+        "coverage": "complete",
+        "boundary": null,
+        "required_values": [],
+        "required_terms": [],
+        "forbidden_claims": [],
+        "forbid_numeric_answer": false
+      }
+    },
+    {
+      "case_id": "pcv3_005",
+      "prompt": "Show first departure from Karlshamn in March 2022.",
+      "normalized_prompt": "show first departure from karlshamn in march 2022.",
+      "source_tags": [
+        "ui:traffic_monitoring"
+      ],
+      "source_expectations": [],
+      "expectations": {
+        "intents": [
+          "A"
+        ],
+        "metric": "arrivals_vessels",
+        "entities": {
+          "ports": [
+            "SEKAN"
+          ],
+          "mmsi": null,
+          "call_id": null,
+          "vessel_type": null,
+          "dow": null,
+          "dow_compare": null,
+          "aggregation": "first_departure"
+        },
+        "dates": {
+          "mode": "absolute",
+          "date_from": "2022-03-01",
+          "date_to": "2022-03-31",
+          "target_date": null
+        },
+        "result_states": [
+          "COMPUTED"
+        ],
+        "coverage": "complete",
+        "boundary": null,
+        "required_values": [],
+        "required_terms": [],
+        "forbidden_claims": [],
+        "forbid_numeric_answer": false
+      }
+    },
+    {
+      "case_id": "pcv3_006",
+      "prompt": "What is median and p90 route travel time from PLSZZ to PLSWI in 2021-02?",
+      "normalized_prompt": "what is median and p90 route travel time from plszz to plswi in 2021-02?",
+      "source_tags": [
+        "ui:traffic_monitoring"
+      ],
+      "source_expectations": [],
+      "expectations": {
+        "intents": [
+          "A"
+        ],
+        "metric": "route_duration_h",
+        "entities": {
+          "ports": [
+            "PLSZZ",
+            "PLSWI"
+          ],
+          "mmsi": null,
+          "call_id": null,
+          "vessel_type": null,
+          "dow": null,
+          "dow_compare": null,
+          "aggregation": "route_travel_time_summary"
+        },
+        "dates": {
+          "mode": "absolute",
+          "date_from": "2021-02-01",
+          "date_to": "2021-02-28",
+          "target_date": null
+        },
+        "result_states": [
+          "NOT_COMPUTABLE"
+        ],
+        "coverage": "unavailable",
+        "boundary": null,
+        "required_values": [],
+        "required_terms": [],
+        "forbidden_claims": [],
+        "forbid_numeric_answer": false
+      }
+    },
+    {
+      "case_id": "pcv3_007",
+      "prompt": "Compare arrivals at PLSZZ and PLSWI and route durations from PLSZZ to PLSWI and PLSWI to SEMMA in 2021-02.",
+      "normalized_prompt": "compare arrivals at plszz and plswi and route durations from plszz to plswi and plswi to semma in 2021-02.",
+      "source_tags": [
+        "ui:traffic_monitoring"
+      ],
+      "source_expectations": [],
+      "expectations": {
+        "intents": [
+          "D"
+        ],
+        "metric": "route_duration_h",
+        "entities": {
+          "ports": [
+            "PLSZZ",
+            "PLSWI"
+          ],
+          "mmsi": null,
+          "call_id": null,
+          "vessel_type": null,
+          "dow": null,
+          "dow_compare": null,
+          "aggregation": null
+        },
+        "dates": {
+          "mode": "absolute",
+          "date_from": "2021-02-01",
+          "date_to": "2021-02-28",
+          "target_date": null
+        },
+        "result_states": [
+          "COMPUTED"
+        ],
+        "coverage": "partial",
+        "boundary": null,
+        "required_values": [],
+        "required_terms": [
+          "partial coverage"
+        ],
+        "forbidden_claims": [],
+        "forbid_numeric_answer": false
+      }
+    },
+    {
+      "case_id": "pcv3_008",
+      "prompt": "Which weekday is usually busiest at LVVNT?",
+      "normalized_prompt": "which weekday is usually busiest at lvvnt?",
+      "source_tags": [
+        "legacy:traffic_monitoring",
+        "ui:traffic_monitoring"
+      ],
+      "source_expectations": [
+        "ok"
+      ],
+      "expectations": {
+        "intents": [
+          "B"
+        ],
+        "metric": "arrivals_vessels",
+        "entities": {
+          "ports": [
+            "LVVNT"
+          ],
+          "mmsi": null,
+          "call_id": null,
+          "vessel_type": null,
+          "dow": "Weekday",
+          "dow_compare": null,
+          "aggregation": null
+        },
+        "dates": {
+          "mode": "absolute",
+          "date_from": null,
+          "date_to": null,
+          "target_date": null
+        },
+        "result_states": [
+          "COMPUTED"
+        ],
+        "coverage": "complete",
+        "boundary": null,
+        "required_values": [],
+        "required_terms": [],
+        "forbidden_claims": [],
+        "forbid_numeric_answer": false
+      }
+    },
+    {
+      "case_id": "pcv3_009",
+      "prompt": "Compare Friday and Monday arrivals at GDANSK in March 2022.",
+      "normalized_prompt": "compare friday and monday arrivals at gdansk in march 2022.",
+      "source_tags": [
+        "legacy:traffic_monitoring",
+        "ui:traffic_monitoring"
+      ],
+      "source_expectations": [
+        "ok"
+      ],
+      "expectations": {
+        "intents": [
+          "B"
+        ],
+        "metric": "arrivals_vessels",
+        "entities": {
+          "ports": [
+            "PLGDN"
+          ],
+          "mmsi": null,
+          "call_id": null,
+          "vessel_type": null,
+          "dow": "Friday",
+          "dow_compare": "Monday",
+          "aggregation": null
+        },
+        "dates": {
+          "mode": "absolute",
+          "date_from": "2022-03-01",
+          "date_to": "2022-03-31",
+          "target_date": null
+        },
+        "result_states": [
+          "COMPUTED"
+        ],
+        "coverage": "complete",
+        "boundary": null,
+        "required_values": [],
+        "required_terms": [],
+        "forbidden_claims": [],
+        "forbid_numeric_answer": false
+      }
+    },
+    {
+      "case_id": "pcv3_010",
+      "prompt": "Show daily arrival counts at LVVNT between 2022-02-01 and 2022-02-28.",
+      "normalized_prompt": "show daily arrival counts at lvvnt between 2022-02-01 and 2022-02-28.",
+      "source_tags": [
+        "catalog:traffic_monitoring",
+        "legacy:traffic_monitoring",
+        "ui:traffic_monitoring"
+      ],
+      "source_expectations": [
+        "COMPUTED",
+        "ok"
+      ],
+      "expectations": {
+        "intents": [
+          "A"
+        ],
+        "metric": "arrivals_vessels",
+        "entities": {
+          "ports": [
+            "LVVNT"
+          ],
+          "mmsi": null,
+          "call_id": null,
+          "vessel_type": null,
+          "dow": null,
+          "dow_compare": null,
+          "aggregation": null
+        },
+        "dates": {
+          "mode": "absolute",
+          "date_from": "2022-02-01",
+          "date_to": "2022-02-28",
+          "target_date": null
+        },
+        "result_states": [
+          "COMPUTED"
+        ],
+        "coverage": "complete",
+        "boundary": null,
+        "required_values": [],
+        "required_terms": [],
+        "forbidden_claims": [],
+        "forbid_numeric_answer": false
+      }
+    },
+    {
+      "case_id": "pcv3_011",
+      "prompt": "How many tanker arrivals were recorded at LVVNT between 2022-03-01 and 2022-03-10?",
+      "normalized_prompt": "how many tanker arrivals were recorded at lvvnt between 2022-03-01 and 2022-03-10?",
+      "source_tags": [
+        "catalog:traffic_monitoring",
+        "legacy:traffic_monitoring",
+        "ui:traffic_monitoring"
+      ],
+      "source_expectations": [
+        "COMPUTED",
+        "ok"
+      ],
+      "expectations": {
+        "intents": [
+          "A"
+        ],
+        "metric": "arrivals_vessels",
+        "entities": {
+          "ports": [
+            "LVVNT"
+          ],
+          "mmsi": null,
+          "call_id": null,
+          "vessel_type": "tanker",
+          "dow": null,
+          "dow_compare": null,
+          "aggregation": null
+        },
+        "dates": {
+          "mode": "absolute",
+          "date_from": "2022-03-01",
+          "date_to": "2022-03-10",
+          "target_date": null
+        },
+        "result_states": [
+          "COMPUTED"
+        ],
+        "coverage": "complete",
+        "boundary": null,
+        "required_values": [],
+        "required_terms": [],
+        "forbidden_claims": [],
+        "forbid_numeric_answer": false
+      }
+    },
+    {
+      "case_id": "pcv3_012",
+      "prompt": "What was the peak arrival day at SEGOT in March 2022?",
+      "normalized_prompt": "what was the peak arrival day at segot in march 2022?",
+      "source_tags": [
+        "catalog:traffic_monitoring",
+        "legacy:traffic_monitoring",
+        "ui:traffic_monitoring"
+      ],
+      "source_expectations": [
+        "COMPUTED",
+        "ok"
+      ],
+      "expectations": {
+        "intents": [
+          "A"
+        ],
+        "metric": "arrivals_vessels",
+        "entities": {
+          "ports": [
+            "SEGOT"
+          ],
+          "mmsi": null,
+          "call_id": null,
+          "vessel_type": null,
+          "dow": null,
+          "dow_compare": null,
+          "aggregation": "peak_day"
+        },
+        "dates": {
+          "mode": "absolute",
+          "date_from": "2022-03-01",
+          "date_to": "2022-03-31",
+          "target_date": null
+        },
+        "result_states": [
+          "COMPUTED"
+        ],
+        "coverage": "complete",
+        "boundary": null,
+        "required_values": [],
+        "required_terms": [],
+        "forbidden_claims": [],
+        "forbid_numeric_answer": false
+      }
+    },
+    {
+      "case_id": "pcv3_013",
+      "prompt": "Which port had more arrivals in March 2022: LVVNT or SEGOT?",
+      "normalized_prompt": "which port had more arrivals in march 2022: lvvnt or segot?",
+      "source_tags": [
+        "legacy:traffic_monitoring",
+        "ui:traffic_monitoring"
+      ],
+      "source_expectations": [
+        "ok"
+      ],
+      "expectations": {
+        "intents": [
+          "D"
+        ],
+        "metric": "arrivals_vessels",
+        "entities": {
+          "ports": [
+            "LVVNT",
+            "SEGOT"
+          ],
+          "mmsi": null,
+          "call_id": null,
+          "vessel_type": null,
+          "dow": null,
+          "dow_compare": null,
+          "aggregation": null
+        },
+        "dates": {
+          "mode": "absolute",
+          "date_from": "2022-03-01",
+          "date_to": "2022-03-31",
+          "target_date": null
+        },
+        "result_states": [
+          "COMPUTED"
+        ],
+        "coverage": "complete",
+        "boundary": null,
+        "required_values": [],
+        "required_terms": [],
+        "forbidden_claims": [],
+        "forbid_numeric_answer": false
+      }
+    },
+    {
+      "case_id": "pcv3_014",
+      "prompt": "Show cargo-ship arrivals at GDANSK during 2022-03.",
+      "normalized_prompt": "show cargo-ship arrivals at gdansk during 2022-03.",
+      "source_tags": [
+        "catalog:traffic_monitoring",
+        "legacy:traffic_monitoring",
+        "ui:traffic_monitoring"
+      ],
+      "source_expectations": [
+        "COMPUTED",
+        "ok"
+      ],
+      "expectations": {
+        "intents": [
+          "A"
+        ],
+        "metric": "arrivals_vessels",
+        "entities": {
+          "ports": [
+            "PLGDN"
+          ],
+          "mmsi": null,
+          "call_id": null,
+          "vessel_type": "cargo ship",
+          "dow": null,
+          "dow_compare": null,
+          "aggregation": null
+        },
+        "dates": {
+          "mode": "absolute",
+          "date_from": "2022-03-01",
+          "date_to": "2022-03-31",
+          "target_date": null
+        },
+        "result_states": [
+          "COMPUTED"
+        ],
+        "coverage": "complete",
+        "boundary": null,
+        "required_values": [],
+        "required_terms": [],
+        "forbidden_claims": [],
+        "forbid_numeric_answer": false
+      }
+    },
+    {
+      "case_id": "pcv3_015",
+      "prompt": "For MMSI 245286000, how long was the vessel in port on 2021-01-01?",
+      "normalized_prompt": "for mmsi 245286000, how long was the vessel in port on 2021-01-01?",
+      "source_tags": [
+        "catalog:vessel_investigation",
+        "legacy:vessel_investigation",
+        "ui:vessel_investigation"
+      ],
+      "source_expectations": [
+        "COMPUTED|NOT_COMPUTABLE",
+        "ok"
+      ],
+      "expectations": {
+        "intents": [
+          "A"
+        ],
+        "metric": "arrivals_vessels",
+        "entities": {
+          "ports": [],
+          "mmsi": "245286000",
+          "call_id": null,
+          "vessel_type": null,
+          "dow": null,
+          "dow_compare": null,
+          "aggregation": null
+        },
+        "dates": {
+          "mode": "absolute",
+          "date_from": "2021-01-01",
+          "date_to": "2021-01-01",
+          "target_date": "2021-01-01"
+        },
+        "result_states": [
+          "COMPUTED"
+        ],
+        "coverage": "complete",
+        "boundary": null,
+        "required_values": [],
+        "required_terms": [],
+        "forbidden_claims": [],
+        "forbid_numeric_answer": false
+      }
+    },
+    {
+      "case_id": "pcv3_016",
+      "prompt": "Show suspicious AIS jumps for MMSI 246521000 on 2022-03-10.",
+      "normalized_prompt": "show suspicious ais jumps for mmsi 246521000 on 2022-03-10.",
+      "source_tags": [
+        "legacy:vessel_investigation",
+        "ui:vessel_investigation"
+      ],
+      "source_expectations": [
+        "ok"
+      ],
+      "expectations": {
+        "intents": [
+          "F"
+        ],
+        "metric": "ais_jump",
+        "entities": {
+          "ports": [],
+          "mmsi": "246521000",
+          "call_id": null,
+          "vessel_type": null,
+          "dow": null,
+          "dow_compare": null,
+          "aggregation": null
+        },
+        "dates": {
+          "mode": "absolute",
+          "date_from": "2022-03-10",
+          "date_to": "2022-03-10",
+          "target_date": "2022-03-10"
+        },
+        "result_states": [
+          "COMPUTED"
+        ],
+        "coverage": "complete",
+        "boundary": null,
+        "required_values": [],
+        "required_terms": [],
+        "forbidden_claims": [],
+        "forbid_numeric_answer": false
+      }
+    },
+    {
+      "case_id": "pcv3_017",
+      "prompt": "For MMSI 212575000, summarize suspicious AIS jumps on 2021-01-01.",
+      "normalized_prompt": "for mmsi 212575000, summarize suspicious ais jumps on 2021-01-01.",
+      "source_tags": [
+        "legacy:vessel_investigation",
+        "ui:vessel_investigation"
+      ],
+      "source_expectations": [
+        "ok"
+      ],
+      "expectations": {
+        "intents": [
+          "F"
+        ],
+        "metric": "ais_jump",
+        "entities": {
+          "ports": [],
+          "mmsi": "212575000",
+          "call_id": null,
+          "vessel_type": null,
+          "dow": null,
+          "dow_compare": null,
+          "aggregation": null
+        },
+        "dates": {
+          "mode": "absolute",
+          "date_from": "2021-01-01",
+          "date_to": "2021-01-01",
+          "target_date": "2021-01-01"
+        },
+        "result_states": [
+          "COMPUTED"
+        ],
+        "coverage": "complete",
+        "boundary": null,
+        "required_values": [],
+        "required_terms": [],
+        "forbidden_claims": [],
+        "forbid_numeric_answer": false
+      }
+    },
+    {
+      "case_id": "pcv3_018",
+      "prompt": "List any AIS jump anomalies for MMSI 266232000 between 2021-01-01 and 2021-01-03.",
+      "normalized_prompt": "list any ais jump anomalies for mmsi 266232000 between 2021-01-01 and 2021-01-03.",
+      "source_tags": [
+        "legacy:vessel_investigation",
+        "ui:vessel_investigation"
+      ],
+      "source_expectations": [
+        "ok"
+      ],
+      "expectations": {
+        "intents": [
+          "F"
+        ],
+        "metric": "ais_jump",
+        "entities": {
+          "ports": [],
+          "mmsi": "266232000",
+          "call_id": null,
+          "vessel_type": null,
+          "dow": null,
+          "dow_compare": null,
+          "aggregation": null
+        },
+        "dates": {
+          "mode": "absolute",
+          "date_from": "2021-01-01",
+          "date_to": "2021-01-03",
+          "target_date": null
+        },
+        "result_states": [
+          "COMPUTED"
+        ],
+        "coverage": "complete",
+        "boundary": null,
+        "required_values": [],
+        "required_terms": [],
+        "forbidden_claims": [],
+        "forbid_numeric_answer": false
+      }
+    },
+    {
+      "case_id": "pcv3_019",
+      "prompt": "Show movement anomalies for MMSI 246650000 in March 2022.",
+      "normalized_prompt": "show movement anomalies for mmsi 246650000 in march 2022.",
+      "source_tags": [
+        "legacy:vessel_investigation",
+        "ui:vessel_investigation"
+      ],
+      "source_expectations": [
+        "ok"
+      ],
+      "expectations": {
+        "intents": [
+          "F"
+        ],
+        "metric": "ais_jump",
+        "entities": {
+          "ports": [],
+          "mmsi": "246650000",
+          "call_id": null,
+          "vessel_type": null,
+          "dow": null,
+          "dow_compare": null,
+          "aggregation": null
+        },
+        "dates": {
+          "mode": "absolute",
+          "date_from": "2022-03-01",
+          "date_to": "2022-03-31",
+          "target_date": null
+        },
+        "result_states": [
+          "COMPUTED"
+        ],
+        "coverage": "complete",
+        "boundary": null,
+        "required_values": [],
+        "required_terms": [],
+        "forbidden_claims": [],
+        "forbid_numeric_answer": false
+      }
+    },
+    {
+      "case_id": "pcv3_020",
+      "prompt": "How many anomaly events were detected for MMSI 255806245 in 2022-03?",
+      "normalized_prompt": "how many anomaly events were detected for mmsi 255806245 in 2022-03?",
+      "source_tags": [
+        "legacy:vessel_investigation",
+        "ui:vessel_investigation"
+      ],
+      "source_expectations": [
+        "ok"
+      ],
+      "expectations": {
+        "intents": [
+          "F"
+        ],
+        "metric": "ais_jump",
+        "entities": {
+          "ports": [],
+          "mmsi": "255806245",
+          "call_id": null,
+          "vessel_type": null,
+          "dow": null,
+          "dow_compare": null,
+          "aggregation": null
+        },
+        "dates": {
+          "mode": "absolute",
+          "date_from": "2022-03-01",
+          "date_to": "2022-03-31",
+          "target_date": null
+        },
+        "result_states": [
+          "COMPUTED"
+        ],
+        "coverage": "complete",
+        "boundary": null,
+        "required_values": [],
+        "required_terms": [],
+        "forbidden_claims": [],
+        "forbid_numeric_answer": false
+      }
+    },
+    {
+      "case_id": "pcv3_021",
+      "prompt": "For MMSI 304833000, show port-stay duration evidence during 2022-03.",
+      "normalized_prompt": "for mmsi 304833000, show port-stay duration evidence during 2022-03.",
+      "source_tags": [
+        "legacy:vessel_investigation",
+        "ui:vessel_investigation"
+      ],
+      "source_expectations": [
+        "ok"
+      ],
+      "expectations": {
+        "intents": [
+          "A"
+        ],
+        "metric": "dwell_minutes",
+        "entities": {
+          "ports": [],
+          "mmsi": "304833000",
+          "call_id": null,
+          "vessel_type": null,
+          "dow": null,
+          "dow_compare": null,
+          "aggregation": null
+        },
+        "dates": {
+          "mode": "absolute",
+          "date_from": "2022-03-01",
+          "date_to": "2022-03-31",
+          "target_date": null
+        },
+        "result_states": [
+          "COMPUTED"
+        ],
+        "coverage": "complete",
+        "boundary": null,
+        "required_values": [],
+        "required_terms": [],
+        "forbidden_claims": [],
+        "forbid_numeric_answer": false
+      }
+    },
+    {
+      "case_id": "pcv3_022",
+      "prompt": "Investigate whether MMSI 377587000 showed unusual position jumps near SEGVX.",
+      "normalized_prompt": "investigate whether mmsi 377587000 showed unusual position jumps near segvx.",
+      "source_tags": [
+        "legacy:vessel_investigation",
+        "ui:vessel_investigation"
+      ],
+      "source_expectations": [
+        "ok"
+      ],
+      "expectations": {
+        "intents": [
+          "F"
+        ],
+        "metric": "ais_jump",
+        "entities": {
+          "ports": [
+            "SEGVX"
+          ],
+          "mmsi": "377587000",
+          "call_id": null,
+          "vessel_type": null,
+          "dow": null,
+          "dow_compare": null,
+          "aggregation": null
+        },
+        "dates": {
+          "mode": "absolute",
+          "date_from": null,
+          "date_to": null,
+          "target_date": null
+        },
+        "result_states": [
+          "COMPUTED"
+        ],
+        "coverage": "complete",
+        "boundary": null,
+        "required_values": [],
+        "required_terms": [],
+        "forbidden_claims": [],
+        "forbid_numeric_answer": false
+      }
+    },
+    {
+      "case_id": "pcv3_023",
+      "prompt": "What will congestion be at LVVNT on Friday, February 20, 2026?",
+      "normalized_prompt": "what will congestion be at lvvnt on friday, february 20, 2026?",
+      "source_tags": [
+        "catalog:eta_delay",
+        "legacy:forecast_planning",
+        "ui:eta_delay"
+      ],
+      "source_expectations": [
+        "FORECAST_ONLY|COMPUTED",
+        "ok"
+      ],
+      "expectations": {
+        "intents": [
+          "C"
+        ],
+        "metric": "congestion_index",
+        "entities": {
+          "ports": [
+            "LVVNT"
+          ],
+          "mmsi": null,
+          "call_id": null,
+          "vessel_type": null,
+          "dow": "Friday",
+          "dow_compare": null,
+          "aggregation": null
+        },
+        "dates": {
+          "mode": "absolute",
+          "date_from": "2026-02-20",
+          "date_to": "2026-02-20",
+          "target_date": "2026-02-20"
+        },
+        "result_states": [
+          "FORECAST_ONLY"
+        ],
+        "coverage": "forecast",
+        "boundary": null,
+        "required_values": [],
+        "required_terms": [],
+        "forbidden_claims": [],
+        "forbid_numeric_answer": false
+      }
+    },
+    {
+      "case_id": "pcv3_024",
+      "prompt": "Predict congestion for SEGOT next Friday based on historical patterns.",
+      "normalized_prompt": "predict congestion for segot next friday based on historical patterns.",
+      "source_tags": [
+        "legacy:forecast_planning",
+        "ui:eta_delay"
+      ],
+      "source_expectations": [
+        "ok"
+      ],
+      "expectations": {
+        "intents": [
+          "C"
+        ],
+        "metric": "congestion_index",
+        "entities": {
+          "ports": [
+            "SEGOT"
+          ],
+          "mmsi": null,
+          "call_id": null,
+          "vessel_type": null,
+          "dow": "Friday",
+          "dow_compare": null,
+          "aggregation": null
+        },
+        "dates": {
+          "mode": "relative",
+          "date_from": null,
+          "date_to": null,
+          "target_date": null
+        },
+        "result_states": [
+          "FORECAST_ONLY"
+        ],
+        "coverage": "forecast",
+        "boundary": null,
+        "required_values": [],
+        "required_terms": [],
+        "forbidden_claims": [],
+        "forbid_numeric_answer": false
+      }
+    },
+    {
+      "case_id": "pcv3_025",
+      "prompt": "Expected congestion at GDANSK on 2026-03-06?",
+      "normalized_prompt": "expected congestion at gdansk on 2026-03-06?",
+      "source_tags": [
+        "catalog:eta_delay",
+        "legacy:forecast_planning",
+        "ui:eta_delay"
+      ],
+      "source_expectations": [
+        "FORECAST_ONLY|COMPUTED",
+        "ok"
+      ],
+      "expectations": {
+        "intents": [
+          "C"
+        ],
+        "metric": "congestion_index",
+        "entities": {
+          "ports": [
+            "PLGDN"
+          ],
+          "mmsi": null,
+          "call_id": null,
+          "vessel_type": null,
+          "dow": null,
+          "dow_compare": null,
+          "aggregation": null
+        },
+        "dates": {
+          "mode": "absolute",
+          "date_from": "2026-03-06",
+          "date_to": "2026-03-06",
+          "target_date": "2026-03-06"
+        },
+        "result_states": [
+          "FORECAST_ONLY"
+        ],
+        "coverage": "forecast",
+        "boundary": null,
+        "required_values": [],
+        "required_terms": [],
+        "forbidden_claims": [],
+        "forbid_numeric_answer": false
+      }
+    },
+    {
+      "case_id": "pcv3_026",
+      "prompt": "Compare expected congestion next Friday between LVVNT and SEGOT.",
+      "normalized_prompt": "compare expected congestion next friday between lvvnt and segot.",
+      "source_tags": [
+        "catalog:eta_delay",
+        "legacy:forecast_planning",
+        "ui:eta_delay"
+      ],
+      "source_expectations": [
+        "FORECAST_ONLY|COMPUTED",
+        "ok"
+      ],
+      "expectations": {
+        "intents": [
+          "C"
+        ],
+        "metric": "congestion_index",
+        "entities": {
+          "ports": [
+            "LVVNT",
+            "SEGOT"
+          ],
+          "mmsi": null,
+          "call_id": null,
+          "vessel_type": null,
+          "dow": "Friday",
+          "dow_compare": null,
+          "aggregation": null
+        },
+        "dates": {
+          "mode": "relative",
+          "date_from": null,
+          "date_to": null,
+          "target_date": null
+        },
+        "result_states": [
+          "FORECAST_ONLY"
+        ],
+        "coverage": "forecast",
+        "boundary": null,
+        "required_values": [],
+        "required_terms": [],
+        "forbidden_claims": [],
+        "forbid_numeric_answer": false
+      }
+    },
+    {
+      "case_id": "pcv3_027",
+      "prompt": "Predict whether LUBECK is likely high congestion on 2026-02-20.",
+      "normalized_prompt": "predict whether lubeck is likely high congestion on 2026-02-20.",
+      "source_tags": [
+        "catalog:eta_delay",
+        "legacy:forecast_planning",
+        "ui:eta_delay"
+      ],
+      "source_expectations": [
+        "FORECAST_ONLY|COMPUTED",
+        "ok"
+      ],
+      "expectations": {
+        "intents": [
+          "C"
+        ],
+        "metric": "congestion_index",
+        "entities": {
+          "ports": [
+            "LUBECK"
+          ],
+          "mmsi": null,
+          "call_id": null,
+          "vessel_type": null,
+          "dow": null,
+          "dow_compare": null,
+          "aggregation": null
+        },
+        "dates": {
+          "mode": "absolute",
+          "date_from": "2026-02-20",
+          "date_to": "2026-02-20",
+          "target_date": "2026-02-20"
+        },
+        "result_states": [
+          "FORECAST_ONLY"
+        ],
+        "coverage": "forecast",
+        "boundary": null,
+        "required_values": [],
+        "required_terms": [],
+        "forbidden_claims": [],
+        "forbid_numeric_answer": false
+      }
+    },
+    {
+      "case_id": "pcv3_028",
+      "prompt": "Forecast congestion at SEGVX for 2026-02-20 with confidence range.",
+      "normalized_prompt": "forecast congestion at segvx for 2026-02-20 with confidence range.",
+      "source_tags": [
+        "legacy:forecast_planning",
+        "ui:eta_delay"
+      ],
+      "source_expectations": [
+        "ok"
+      ],
+      "expectations": {
+        "intents": [
+          "C"
+        ],
+        "metric": "congestion_index",
+        "entities": {
+          "ports": [
+            "SEGVX"
+          ],
+          "mmsi": null,
+          "call_id": null,
+          "vessel_type": null,
+          "dow": null,
+          "dow_compare": null,
+          "aggregation": null
+        },
+        "dates": {
+          "mode": "absolute",
+          "date_from": "2026-02-20",
+          "date_to": "2026-02-20",
+          "target_date": "2026-02-20"
+        },
+        "result_states": [
+          "FORECAST_ONLY"
+        ],
+        "coverage": "forecast",
+        "boundary": null,
+        "required_values": [],
+        "required_terms": [],
+        "forbidden_claims": [],
+        "forbid_numeric_answer": false
+      }
+    },
+    {
+      "case_id": "pcv3_029",
+      "prompt": "What is the expected congestion index at LVVNT on 2026-03-13?",
+      "normalized_prompt": "what is the expected congestion index at lvvnt on 2026-03-13?",
+      "source_tags": [
+        "legacy:forecast_planning",
+        "ui:eta_delay"
+      ],
+      "source_expectations": [
+        "ok"
+      ],
+      "expectations": {
+        "intents": [
+          "C"
+        ],
+        "metric": "congestion_index",
+        "entities": {
+          "ports": [
+            "LVVNT"
+          ],
+          "mmsi": null,
+          "call_id": null,
+          "vessel_type": null,
+          "dow": null,
+          "dow_compare": null,
+          "aggregation": null
+        },
+        "dates": {
+          "mode": "absolute",
+          "date_from": "2026-03-13",
+          "date_to": "2026-03-13",
+          "target_date": "2026-03-13"
+        },
+        "result_states": [
+          "FORECAST_ONLY"
+        ],
+        "coverage": "forecast",
+        "boundary": null,
+        "required_values": [],
+        "required_terms": [],
+        "forbidden_claims": [],
+        "forbid_numeric_answer": false
+      }
+    },
+    {
+      "case_id": "pcv3_030",
+      "prompt": "Will SEGOT likely remain above baseline congestion next Friday?",
+      "normalized_prompt": "will segot likely remain above baseline congestion next friday?",
+      "source_tags": [
+        "catalog:eta_delay",
+        "legacy:forecast_planning",
+        "ui:eta_delay"
+      ],
+      "source_expectations": [
+        "FORECAST_ONLY|COMPUTED",
+        "ok"
+      ],
+      "expectations": {
+        "intents": [
+          "C"
+        ],
+        "metric": "congestion_index",
+        "entities": {
+          "ports": [
+            "SEGOT"
+          ],
+          "mmsi": null,
+          "call_id": null,
+          "vessel_type": null,
+          "dow": "Friday",
+          "dow_compare": null,
+          "aggregation": null
+        },
+        "dates": {
+          "mode": "relative",
+          "date_from": null,
+          "date_to": null,
+          "target_date": null
+        },
+        "result_states": [
+          "FORECAST_ONLY"
+        ],
+        "coverage": "forecast",
+        "boundary": null,
+        "required_values": [],
+        "required_terms": [],
+        "forbidden_claims": [],
+        "forbid_numeric_answer": false
+      }
+    },
+    {
+      "case_id": "pcv3_031",
+      "prompt": "Compare forecast congestion on 2026-03-06 for LVVNT, SEGOT, and GDANSK.",
+      "normalized_prompt": "compare forecast congestion on 2026-03-06 for lvvnt, segot, and gdansk.",
+      "source_tags": [
+        "legacy:forecast_planning",
+        "ui:eta_delay"
+      ],
+      "source_expectations": [
+        "ok"
+      ],
+      "expectations": {
+        "intents": [
+          "C"
+        ],
+        "metric": "congestion_index",
+        "entities": {
+          "ports": [
+            "LVVNT",
+            "SEGOT",
+            "PLGDN"
+          ],
+          "mmsi": null,
+          "call_id": null,
+          "vessel_type": null,
+          "dow": null,
+          "dow_compare": null,
+          "aggregation": null
+        },
+        "dates": {
+          "mode": "absolute",
+          "date_from": "2026-03-06",
+          "date_to": "2026-03-06",
+          "target_date": "2026-03-06"
+        },
+        "result_states": [
+          "FORECAST_ONLY"
+        ],
+        "coverage": "forecast",
+        "boundary": null,
+        "required_values": [],
+        "required_terms": [],
+        "forbidden_claims": [],
+        "forbid_numeric_answer": false
+      }
+    },
+    {
+      "case_id": "pcv3_032",
+      "prompt": "Predict if Monday or Friday will be more congested at LVVNT next week.",
+      "normalized_prompt": "predict if monday or friday will be more congested at lvvnt next week.",
+      "source_tags": [
+        "legacy:forecast_planning",
+        "ui:eta_delay"
+      ],
+      "source_expectations": [
+        "ok"
+      ],
+      "expectations": {
+        "intents": [
+          "C"
+        ],
+        "metric": "congestion_index",
+        "entities": {
+          "ports": [
+            "LVVNT"
+          ],
+          "mmsi": null,
+          "call_id": null,
+          "vessel_type": null,
+          "dow": "Monday",
+          "dow_compare": "Friday",
+          "aggregation": null
+        },
+        "dates": {
+          "mode": "absolute",
+          "date_from": null,
+          "date_to": null,
+          "target_date": null
+        },
+        "result_states": [
+          "FORECAST_ONLY"
+        ],
+        "coverage": "forecast",
+        "boundary": null,
+        "required_values": [],
+        "required_terms": [],
+        "forbidden_claims": [],
+        "forbid_numeric_answer": false
+      }
+    },
+    {
+      "case_id": "pcv3_033",
+      "prompt": "What is the port pressure index at SEGOT in March 2022?",
+      "normalized_prompt": "what is the port pressure index at segot in march 2022?",
+      "source_tags": [
+        "catalog:port_pressure",
+        "ui:port_pressure"
+      ],
+      "source_expectations": [
+        "COMPUTED"
+      ],
+      "expectations": {
+        "intents": [
+          "A"
+        ],
+        "metric": "congestion_index",
+        "entities": {
+          "ports": [
+            "SEGOT"
+          ],
+          "mmsi": null,
+          "call_id": null,
+          "vessel_type": null,
+          "dow": null,
+          "dow_compare": null,
+          "aggregation": null
+        },
+        "dates": {
+          "mode": "absolute",
+          "date_from": "2022-03-01",
+          "date_to": "2022-03-31",
+          "target_date": null
+        },
+        "result_states": [
+          "COMPUTED"
+        ],
+        "coverage": "complete",
+        "boundary": null,
+        "required_values": [],
+        "required_terms": [],
+        "forbidden_claims": [],
+        "forbid_numeric_answer": false
+      }
+    },
+    {
+      "case_id": "pcv3_034",
+      "prompt": "Show port pressure trend at LVVNT between 2022-02-01 and 2022-02-28.",
+      "normalized_prompt": "show port pressure trend at lvvnt between 2022-02-01 and 2022-02-28.",
+      "source_tags": [
+        "catalog:port_pressure",
+        "ui:port_pressure"
+      ],
+      "source_expectations": [
+        "COMPUTED"
+      ],
+      "expectations": {
+        "intents": [
+          "A"
+        ],
+        "metric": "congestion_index",
+        "entities": {
+          "ports": [
+            "LVVNT"
+          ],
+          "mmsi": null,
+          "call_id": null,
+          "vessel_type": null,
+          "dow": null,
+          "dow_compare": null,
+          "aggregation": null
+        },
+        "dates": {
+          "mode": "absolute",
+          "date_from": "2022-02-01",
+          "date_to": "2022-02-28",
+          "target_date": null
+        },
+        "result_states": [
+          "COMPUTED"
+        ],
+        "coverage": "complete",
+        "boundary": null,
+        "required_values": [],
+        "required_terms": [],
+        "forbidden_claims": [],
+        "forbid_numeric_answer": false
+      }
+    },
+    {
+      "case_id": "pcv3_035",
+      "prompt": "Compare port pressure between SEGOT and GDANSK in March 2022.",
+      "normalized_prompt": "compare port pressure between segot and gdansk in march 2022.",
+      "source_tags": [
+        "catalog:port_pressure",
+        "ui:port_pressure"
+      ],
+      "source_expectations": [
+        "COMPUTED"
+      ],
+      "expectations": {
+        "intents": [
+          "D"
+        ],
+        "metric": "congestion_index",
+        "entities": {
+          "ports": [
+            "SEGOT",
+            "PLGDN"
+          ],
+          "mmsi": null,
+          "call_id": null,
+          "vessel_type": null,
+          "dow": null,
+          "dow_compare": null,
+          "aggregation": null
+        },
+        "dates": {
+          "mode": "absolute",
+          "date_from": "2022-03-01",
+          "date_to": "2022-03-31",
+          "target_date": null
+        },
+        "result_states": [
+          "COMPUTED"
+        ],
+        "coverage": "complete",
+        "boundary": null,
+        "required_values": [],
+        "required_terms": [],
+        "forbidden_claims": [],
+        "forbid_numeric_answer": false
+      }
+    },
+    {
+      "case_id": "pcv3_036",
+      "prompt": "Which days had the highest pressure at LVVNT in 2022-03?",
+      "normalized_prompt": "which days had the highest pressure at lvvnt in 2022-03?",
+      "source_tags": [
+        "catalog:port_pressure",
+        "ui:port_pressure"
+      ],
+      "source_expectations": [
+        "COMPUTED"
+      ],
+      "expectations": {
+        "intents": [
+          "A"
+        ],
+        "metric": "congestion_index",
+        "entities": {
+          "ports": [
+            "LVVNT"
+          ],
+          "mmsi": null,
+          "call_id": null,
+          "vessel_type": null,
+          "dow": null,
+          "dow_compare": null,
+          "aggregation": "peak_day"
+        },
+        "dates": {
+          "mode": "absolute",
+          "date_from": "2022-03-01",
+          "date_to": "2022-03-31",
+          "target_date": null
+        },
+        "result_states": [
+          "COMPUTED"
+        ],
+        "coverage": "complete",
+        "boundary": null,
+        "required_values": [],
+        "required_terms": [],
+        "forbidden_claims": [],
+        "forbid_numeric_answer": false
+      }
+    },
+    {
+      "case_id": "pcv3_037",
+      "prompt": "Is pressure at SEGVX above baseline on 2022-03-10?",
+      "normalized_prompt": "is pressure at segvx above baseline on 2022-03-10?",
+      "source_tags": [
+        "catalog:port_pressure",
+        "ui:port_pressure"
+      ],
+      "source_expectations": [
+        "COMPUTED|NOT_COMPUTABLE"
+      ],
+      "expectations": {
+        "intents": [
+          "A"
+        ],
+        "metric": "congestion_index",
+        "entities": {
+          "ports": [
+            "SEGVX"
+          ],
+          "mmsi": null,
+          "call_id": null,
+          "vessel_type": null,
+          "dow": null,
+          "dow_compare": null,
+          "aggregation": null
+        },
+        "dates": {
+          "mode": "absolute",
+          "date_from": "2022-03-10",
+          "date_to": "2022-03-10",
+          "target_date": "2022-03-10"
+        },
+        "result_states": [
+          "COMPUTED"
+        ],
+        "coverage": "complete",
+        "boundary": null,
+        "required_values": [],
+        "required_terms": [],
+        "forbidden_claims": [],
+        "forbid_numeric_answer": false
+      }
+    },
+    {
+      "case_id": "pcv3_038",
+      "prompt": "Show pressure by vessel type at GDANSK for 2022-03.",
+      "normalized_prompt": "show pressure by vessel type at gdansk for 2022-03.",
+      "source_tags": [
+        "ui:port_pressure"
+      ],
+      "source_expectations": [],
+      "expectations": {
+        "intents": [
+          "A"
+        ],
+        "metric": "congestion_index",
+        "entities": {
+          "ports": [
+            "PLGDN"
+          ],
+          "mmsi": null,
+          "call_id": null,
+          "vessel_type": null,
+          "dow": null,
+          "dow_compare": null,
+          "aggregation": null
+        },
+        "dates": {
+          "mode": "absolute",
+          "date_from": "2022-03-01",
+          "date_to": "2022-03-31",
+          "target_date": null
+        },
+        "result_states": [
+          "COMPUTED"
+        ],
+        "coverage": "complete",
+        "boundary": null,
+        "required_values": [],
+        "required_terms": [],
+        "forbidden_claims": [],
+        "forbid_numeric_answer": false
+      }
+    },
+    {
+      "case_id": "pcv3_039",
+      "prompt": "Compare Friday versus Monday port pressure at SEGOT.",
+      "normalized_prompt": "compare friday versus monday port pressure at segot.",
+      "source_tags": [
+        "ui:port_pressure"
+      ],
+      "source_expectations": [],
+      "expectations": {
+        "intents": [
+          "B"
+        ],
+        "metric": "congestion_index",
+        "entities": {
+          "ports": [
+            "SEGOT"
+          ],
+          "mmsi": null,
+          "call_id": null,
+          "vessel_type": null,
+          "dow": "Friday",
+          "dow_compare": "Monday",
+          "aggregation": null
+        },
+        "dates": {
+          "mode": "absolute",
+          "date_from": null,
+          "date_to": null,
+          "target_date": null
+        },
+        "result_states": [
+          "COMPUTED"
+        ],
+        "coverage": "complete",
+        "boundary": null,
+        "required_values": [],
+        "required_terms": [],
+        "forbidden_claims": [],
+        "forbid_numeric_answer": false
+      }
+    },
+    {
+      "case_id": "pcv3_040",
+      "prompt": "List top 5 high-pressure days at LVVNT in 2022-03.",
+      "normalized_prompt": "list top 5 high-pressure days at lvvnt in 2022-03.",
+      "source_tags": [
+        "ui:port_pressure"
+      ],
+      "source_expectations": [],
+      "expectations": {
+        "intents": [
+          "A"
+        ],
+        "metric": "congestion_index",
+        "entities": {
+          "ports": [
+            "LVVNT"
+          ],
+          "mmsi": null,
+          "call_id": null,
+          "vessel_type": null,
+          "dow": null,
+          "dow_compare": null,
+          "aggregation": "peak_day"
+        },
+        "dates": {
+          "mode": "absolute",
+          "date_from": "2022-03-01",
+          "date_to": "2022-03-31",
+          "target_date": null
+        },
+        "result_states": [
+          "COMPUTED"
+        ],
+        "coverage": "complete",
+        "boundary": null,
+        "required_values": [],
+        "required_terms": [],
+        "forbidden_claims": [],
+        "forbid_numeric_answer": false
+      }
+    },
+    {
+      "case_id": "pcv3_041",
+      "prompt": "What are TTW emissions at SEGOT in March 2022 for CO2e, NOx, SOx, and PM?",
+      "normalized_prompt": "what are ttw emissions at segot in march 2022 for co2e, nox, sox, and pm?",
+      "source_tags": [
+        "catalog:carbon_deterministic",
+        "legacy:carbon_emissions",
+        "ui:carbon_emissions"
+      ],
+      "source_expectations": [
+        "COMPUTED",
+        "COMPUTED|COMPUTED_ZERO"
+      ],
+      "expectations": {
+        "intents": [
+          "H"
+        ],
+        "metric": "emissions",
+        "entities": {
+          "ports": [
+            "SEGOT"
+          ],
+          "mmsi": null,
+          "call_id": null,
+          "vessel_type": null,
+          "dow": null,
+          "dow_compare": null,
+          "aggregation": null
+        },
+        "dates": {
+          "mode": "absolute",
+          "date_from": "2022-03-01",
+          "date_to": "2022-03-31",
+          "target_date": null
+        },
+        "result_states": [
+          "COMPUTED",
+          "COMPUTED_ZERO"
+        ],
+        "coverage": "complete",
+        "boundary": "TTW",
+        "required_values": [],
+        "required_terms": [],
+        "forbidden_claims": [],
+        "forbid_numeric_answer": false
+      }
+    },
+    {
+      "case_id": "pcv3_042",
+      "prompt": "Show WTW CO2e emissions at LVVNT between 2022-02-01 and 2022-02-28.",
+      "normalized_prompt": "show wtw co2e emissions at lvvnt between 2022-02-01 and 2022-02-28.",
+      "source_tags": [
+        "catalog:carbon_deterministic",
+        "legacy:carbon_emissions",
+        "ui:carbon_emissions"
+      ],
+      "source_expectations": [
+        "COMPUTED",
+        "COMPUTED|COMPUTED_ZERO"
+      ],
+      "expectations": {
+        "intents": [
+          "H"
+        ],
+        "metric": "emissions",
+        "entities": {
+          "ports": [
+            "LVVNT"
+          ],
+          "mmsi": null,
+          "call_id": null,
+          "vessel_type": null,
+          "dow": null,
+          "dow_compare": null,
+          "aggregation": null
+        },
+        "dates": {
+          "mode": "absolute",
+          "date_from": "2022-02-01",
+          "date_to": "2022-02-28",
+          "target_date": null
+        },
+        "result_states": [
+          "COMPUTED",
+          "COMPUTED_ZERO"
+        ],
+        "coverage": "complete",
+        "boundary": "WTW",
+        "required_values": [],
+        "required_terms": [],
+        "forbidden_claims": [],
+        "forbid_numeric_answer": false
+      }
+    },
+    {
+      "case_id": "pcv3_043",
+      "prompt": "Carbon emissions for SEGOT by month in 2022.",
+      "normalized_prompt": "carbon emissions for segot by month in 2022.",
+      "source_tags": [
+        "legacy:carbon_emissions",
+        "ui:carbon_emissions"
+      ],
+      "source_expectations": [
+        "COMPUTED"
+      ],
+      "expectations": {
+        "intents": [
+          "H"
+        ],
+        "metric": "emissions",
+        "entities": {
+          "ports": [
+            "SEGOT"
+          ],
+          "mmsi": null,
+          "call_id": null,
+          "vessel_type": null,
+          "dow": null,
+          "dow_compare": null,
+          "aggregation": null
+        },
+        "dates": {
+          "mode": "absolute",
+          "date_from": "2022-01-01",
+          "date_to": "2022-12-31",
+          "target_date": null
+        },
+        "result_states": [
+          "COMPUTED",
+          "COMPUTED_ZERO"
+        ],
+        "coverage": "complete",
+        "boundary": "TTW",
+        "required_values": [],
+        "required_terms": [],
+        "forbidden_claims": [],
+        "forbid_numeric_answer": false
+      }
+    },
+    {
+      "case_id": "pcv3_044",
+      "prompt": "Report TTW CO2e and NOx at LVVNT for 2022-03 grouped by day.",
+      "normalized_prompt": "report ttw co2e and nox at lvvnt for 2022-03 grouped by day.",
+      "source_tags": [
+        "catalog:carbon_deterministic",
+        "legacy:carbon_emissions",
+        "ui:carbon_emissions"
+      ],
+      "source_expectations": [
+        "COMPUTED",
+        "COMPUTED|COMPUTED_ZERO"
+      ],
+      "expectations": {
+        "intents": [
+          "H"
+        ],
+        "metric": "emissions",
+        "entities": {
+          "ports": [
+            "LVVNT"
+          ],
+          "mmsi": null,
+          "call_id": null,
+          "vessel_type": null,
+          "dow": null,
+          "dow_compare": null,
+          "aggregation": null
+        },
+        "dates": {
+          "mode": "absolute",
+          "date_from": "2022-03-01",
+          "date_to": "2022-03-31",
+          "target_date": null
+        },
+        "result_states": [
+          "COMPUTED",
+          "COMPUTED_ZERO"
+        ],
+        "coverage": "complete",
+        "boundary": "TTW",
+        "required_values": [],
+        "required_terms": [],
+        "forbidden_claims": [],
+        "forbid_numeric_answer": false
+      }
+    },
+    {
+      "case_id": "pcv3_045",
+      "prompt": "Show WTW CO2e at SEGVX between 2022-03-01 and 2022-03-31.",
+      "normalized_prompt": "show wtw co2e at segvx between 2022-03-01 and 2022-03-31.",
+      "source_tags": [
+        "legacy:carbon_emissions",
+        "ui:carbon_emissions"
+      ],
+      "source_expectations": [
+        "COMPUTED"
+      ],
+      "expectations": {
+        "intents": [
+          "H"
+        ],
+        "metric": "emissions",
+        "entities": {
+          "ports": [
+            "SEGVX"
+          ],
+          "mmsi": null,
+          "call_id": null,
+          "vessel_type": null,
+          "dow": null,
+          "dow_compare": null,
+          "aggregation": null
+        },
+        "dates": {
+          "mode": "absolute",
+          "date_from": "2022-03-01",
+          "date_to": "2022-03-31",
+          "target_date": null
+        },
+        "result_states": [
+          "COMPUTED",
+          "COMPUTED_ZERO"
+        ],
+        "coverage": "complete",
+        "boundary": "WTW",
+        "required_values": [],
+        "required_terms": [],
+        "forbidden_claims": [],
+        "forbid_numeric_answer": false
+      }
+    },
+    {
+      "case_id": "pcv3_046",
+      "prompt": "What are call-level emissions for MMSI 209468000 and call_id 209468000_2021-01-06T10-17-56_SETRG?",
+      "normalized_prompt": "what are call-level emissions for mmsi 209468000 and call_id 209468000_2021-01-06t10-17-56_setrg?",
+      "source_tags": [
+        "catalog:carbon_deterministic",
+        "legacy:carbon_emissions",
+        "ui:carbon_emissions"
+      ],
+      "source_expectations": [
+        "COMPUTED",
+        "COMPUTED|NOT_COMPUTABLE"
+      ],
+      "expectations": {
+        "intents": [
+          "H"
+        ],
+        "metric": "emissions",
+        "entities": {
+          "ports": [],
+          "mmsi": "209468000",
+          "call_id": "209468000_2021-01-06T10-17-56_SETRG",
+          "vessel_type": null,
+          "dow": null,
+          "dow_compare": null,
+          "aggregation": null
+        },
+        "dates": {
+          "mode": "absolute",
+          "date_from": null,
+          "date_to": null,
+          "target_date": null
+        },
+        "result_states": [
+          "COMPUTED",
+          "COMPUTED_ZERO"
+        ],
+        "coverage": "complete",
+        "boundary": "TTW",
+        "required_values": [],
+        "required_terms": [],
+        "forbidden_claims": [],
+        "forbid_numeric_answer": false
+      }
+    },
+    {
+      "case_id": "pcv3_047",
+      "prompt": "Estimate carbon emissions for a tanker in manoeuvring mode for 2 hours at 6 knots.",
+      "normalized_prompt": "estimate carbon emissions for a tanker in manoeuvring mode for 2 hours at 6 knots.",
+      "source_tags": [
+        "catalog:carbon_retrieval_or_no_data",
+        "legacy:carbon_emissions",
+        "ui:carbon_emissions"
+      ],
+      "source_expectations": [
+        "COMPUTED",
+        "COMPUTED|COMPUTED_ZERO|NOT_COMPUTABLE"
+      ],
+      "expectations": {
+        "intents": [
+          "H"
+        ],
+        "metric": "emissions",
+        "entities": {
+          "ports": [],
+          "mmsi": null,
+          "call_id": null,
+          "vessel_type": "tanker",
+          "dow": null,
+          "dow_compare": null,
+          "aggregation": null
+        },
+        "dates": {
+          "mode": "absolute",
+          "date_from": null,
+          "date_to": null,
+          "target_date": null
+        },
+        "result_states": [
+          "COMPUTED",
+          "COMPUTED_ZERO"
+        ],
+        "coverage": "complete",
+        "boundary": "TTW",
+        "required_values": [],
+        "required_terms": [],
+        "forbidden_claims": [],
+        "forbid_numeric_answer": false
+      }
+    },
+    {
+      "case_id": "pcv3_048",
+      "prompt": "Compare TTW versus WTW CO2e totals at SETRG for March 2022.",
+      "normalized_prompt": "compare ttw versus wtw co2e totals at setrg for march 2022.",
+      "source_tags": [
+        "catalog:carbon_deterministic",
+        "legacy:carbon_emissions",
+        "ui:carbon_emissions"
+      ],
+      "source_expectations": [
+        "COMPUTED",
+        "COMPUTED|COMPUTED_ZERO"
+      ],
+      "expectations": {
+        "intents": [
+          "H"
+        ],
+        "metric": "emissions",
+        "entities": {
+          "ports": [
+            "SETRG"
+          ],
+          "mmsi": null,
+          "call_id": null,
+          "vessel_type": null,
+          "dow": null,
+          "dow_compare": null,
+          "aggregation": null
+        },
+        "dates": {
+          "mode": "absolute",
+          "date_from": "2022-03-01",
+          "date_to": "2022-03-31",
+          "target_date": null
+        },
+        "result_states": [
+          "COMPUTED",
+          "COMPUTED_ZERO"
+        ],
+        "coverage": "complete",
+        "boundary": "TTW_WTW",
+        "required_values": [],
+        "required_terms": [
+          "TTW",
+          "WTW"
+        ],
+        "forbidden_claims": [],
+        "forbid_numeric_answer": false
+      }
+    },
+    {
+      "case_id": "pcv3_049",
+      "prompt": "Show monthly WTW CO2e trend for SETRG in 2022.",
+      "normalized_prompt": "show monthly wtw co2e trend for setrg in 2022.",
+      "source_tags": [
+        "legacy:carbon_emissions",
+        "ui:carbon_emissions"
+      ],
+      "source_expectations": [
+        "COMPUTED"
+      ],
+      "expectations": {
+        "intents": [
+          "H"
+        ],
+        "metric": "emissions",
+        "entities": {
+          "ports": [
+            "SETRG"
+          ],
+          "mmsi": null,
+          "call_id": null,
+          "vessel_type": null,
+          "dow": null,
+          "dow_compare": null,
+          "aggregation": null
+        },
+        "dates": {
+          "mode": "absolute",
+          "date_from": "2022-01-01",
+          "date_to": "2022-12-31",
+          "target_date": null
+        },
+        "result_states": [
+          "COMPUTED",
+          "COMPUTED_ZERO"
+        ],
+        "coverage": "complete",
+        "boundary": "WTW",
+        "required_values": [],
+        "required_terms": [],
+        "forbidden_claims": [],
+        "forbid_numeric_answer": false
+      }
+    },
+    {
+      "case_id": "pcv3_050",
+      "prompt": "Give carbon evidence IDs used for LVVNT emissions in 2022-02.",
+      "normalized_prompt": "give carbon evidence ids used for lvvnt emissions in 2022-02.",
+      "source_tags": [
+        "legacy:carbon_emissions",
+        "ui:carbon_emissions"
+      ],
+      "source_expectations": [
+        "COMPUTED"
+      ],
+      "expectations": {
+        "intents": [
+          "H"
+        ],
+        "metric": "emissions",
+        "entities": {
+          "ports": [
+            "LVVNT"
+          ],
+          "mmsi": null,
+          "call_id": null,
+          "vessel_type": null,
+          "dow": null,
+          "dow_compare": null,
+          "aggregation": null
+        },
+        "dates": {
+          "mode": "absolute",
+          "date_from": "2022-02-01",
+          "date_to": "2022-02-28",
+          "target_date": null
+        },
+        "result_states": [
+          "COMPUTED",
+          "COMPUTED_ZERO"
+        ],
+        "coverage": "complete",
+        "boundary": "TTW",
+        "required_values": [],
+        "required_terms": [
+          "Evidence IDs"
+        ],
+        "forbidden_claims": [],
+        "forbid_numeric_answer": false
+      }
+    },
+    {
+      "case_id": "pcv3_051",
+      "prompt": "What is crane utilization at berth 3 in SEGOT today?",
+      "normalized_prompt": "what is crane utilization at berth 3 in segot today?",
+      "source_tags": [
+        "catalog:unsupported_scope",
+        "legacy:unsupported_scope",
+        "paper:critical",
+        "ui:unsupported_scope"
+      ],
+      "source_expectations": [
+        "UNSUPPORTED",
+        "unsupported"
+      ],
+      "expectations": {
+        "intents": [
+          "G"
+        ],
+        "metric": "unsupported",
+        "entities": {
+          "ports": [
+            "SEGOT",
+            "BERTH",
+            "SEGOT today"
+          ],
+          "mmsi": null,
+          "call_id": null,
+          "vessel_type": null,
+          "dow": null,
+          "dow_compare": null,
+          "aggregation": null
+        },
+        "dates": {
+          "mode": "absolute",
+          "date_from": null,
+          "date_to": null,
+          "target_date": null
+        },
+        "result_states": [
+          "UNSUPPORTED"
+        ],
+        "coverage": "unsupported",
+        "boundary": null,
+        "required_values": [],
+        "required_terms": [
+          "outside AIS/port-call scope"
+        ],
+        "forbidden_claims": [
+          "utilization is",
+          "queue length is",
+          "productivity is",
+          "occupancy is",
+          "resolved voyage id"
+        ],
+        "forbid_numeric_answer": true
+      }
+    },
+    {
+      "case_id": "pcv3_052",
+      "prompt": "What is gate queue length at Port of Gdansk right now?",
+      "normalized_prompt": "what is gate queue length at port of gdansk right now?",
+      "source_tags": [
+        "catalog:unsupported_scope",
+        "legacy:unsupported_scope",
+        "ui:unsupported_scope"
+      ],
+      "source_expectations": [
+        "UNSUPPORTED",
+        "unsupported"
+      ],
+      "expectations": {
+        "intents": [
+          "G"
+        ],
+        "metric": "unsupported",
+        "entities": {
+          "ports": [
+            "PLGDN",
+            "Port of Gdansk right now"
+          ],
+          "mmsi": null,
+          "call_id": null,
+          "vessel_type": null,
+          "dow": null,
+          "dow_compare": null,
+          "aggregation": null
+        },
+        "dates": {
+          "mode": "absolute",
+          "date_from": null,
+          "date_to": null,
+          "target_date": null
+        },
+        "result_states": [
+          "UNSUPPORTED"
+        ],
+        "coverage": "unsupported",
+        "boundary": null,
+        "required_values": [],
+        "required_terms": [
+          "outside AIS/port-call scope"
+        ],
+        "forbidden_claims": [
+          "utilization is",
+          "queue length is",
+          "productivity is",
+          "occupancy is",
+          "resolved voyage id"
+        ],
+        "forbid_numeric_answer": true
+      }
+    },
+    {
+      "case_id": "pcv3_053",
+      "prompt": "How many TEU were handled per hour at berth 5 yesterday?",
+      "normalized_prompt": "how many teu were handled per hour at berth 5 yesterday?",
+      "source_tags": [
+        "catalog:unsupported_scope",
+        "legacy:unsupported_scope",
+        "ui:unsupported_scope"
+      ],
+      "source_expectations": [
+        "UNSUPPORTED",
+        "unsupported"
+      ],
+      "expectations": {
+        "intents": [
+          "G"
+        ],
+        "metric": "unsupported",
+        "entities": {
+          "ports": [
+            "BERTH"
+          ],
+          "mmsi": null,
+          "call_id": null,
+          "vessel_type": null,
+          "dow": null,
+          "dow_compare": null,
+          "aggregation": null
+        },
+        "dates": {
+          "mode": "absolute",
+          "date_from": null,
+          "date_to": null,
+          "target_date": null
+        },
+        "result_states": [
+          "UNSUPPORTED"
+        ],
+        "coverage": "unsupported",
+        "boundary": null,
+        "required_values": [],
+        "required_terms": [
+          "outside AIS/port-call scope"
+        ],
+        "forbidden_claims": [
+          "utilization is",
+          "queue length is",
+          "productivity is",
+          "occupancy is",
+          "resolved voyage id"
+        ],
+        "forbid_numeric_answer": true
+      }
+    },
+    {
+      "case_id": "pcv3_054",
+      "prompt": "What is yard occupancy percentage at terminal block C right now?",
+      "normalized_prompt": "what is yard occupancy percentage at terminal block c right now?",
+      "source_tags": [
+        "catalog:unsupported_scope",
+        "legacy:unsupported_scope",
+        "ui:unsupported_scope"
+      ],
+      "source_expectations": [
+        "UNSUPPORTED",
+        "unsupported"
+      ],
+      "expectations": {
+        "intents": [
+          "G"
+        ],
+        "metric": "unsupported",
+        "entities": {
+          "ports": [
+            "terminal block C right now"
+          ],
+          "mmsi": null,
+          "call_id": null,
+          "vessel_type": null,
+          "dow": null,
+          "dow_compare": null,
+          "aggregation": null
+        },
+        "dates": {
+          "mode": "absolute",
+          "date_from": null,
+          "date_to": null,
+          "target_date": null
+        },
+        "result_states": [
+          "UNSUPPORTED"
+        ],
+        "coverage": "unsupported",
+        "boundary": null,
+        "required_values": [],
+        "required_terms": [
+          "outside AIS/port-call scope"
+        ],
+        "forbidden_claims": [
+          "utilization is",
+          "queue length is",
+          "productivity is",
+          "occupancy is",
+          "resolved voyage id"
+        ],
+        "forbid_numeric_answer": true
+      }
+    },
+    {
+      "case_id": "pcv3_055",
+      "prompt": "Show quay crane productivity at LVVNT in March 2022.",
+      "normalized_prompt": "show quay crane productivity at lvvnt in march 2022.",
+      "source_tags": [
+        "catalog:unsupported_scope",
+        "legacy:unsupported_scope",
+        "ui:unsupported_scope"
+      ],
+      "source_expectations": [
+        "UNSUPPORTED",
+        "unsupported"
+      ],
+      "expectations": {
+        "intents": [
+          "G"
+        ],
+        "metric": "unsupported",
+        "entities": {
+          "ports": [
+            "LVVNT"
+          ],
+          "mmsi": null,
+          "call_id": null,
+          "vessel_type": null,
+          "dow": null,
+          "dow_compare": null,
+          "aggregation": null
+        },
+        "dates": {
+          "mode": "absolute",
+          "date_from": "2022-03-01",
+          "date_to": "2022-03-31",
+          "target_date": null
+        },
+        "result_states": [
+          "UNSUPPORTED"
+        ],
+        "coverage": "unsupported",
+        "boundary": null,
+        "required_values": [],
+        "required_terms": [
+          "outside AIS/port-call scope"
+        ],
+        "forbidden_claims": [
+          "utilization is",
+          "queue length is",
+          "productivity is",
+          "occupancy is",
+          "resolved voyage id"
+        ],
+        "forbid_numeric_answer": true
+      }
+    },
+    {
+      "case_id": "pcv3_056",
+      "prompt": "What is truck turn-time at the gate for SEGOT today?",
+      "normalized_prompt": "what is truck turn-time at the gate for segot today?",
+      "source_tags": [
+        "legacy:unsupported_scope",
+        "ui:unsupported_scope"
+      ],
+      "source_expectations": [
+        "unsupported"
+      ],
+      "expectations": {
+        "intents": [
+          "G"
+        ],
+        "metric": "unsupported",
+        "entities": {
+          "ports": [
+            "SEGOT"
+          ],
+          "mmsi": null,
+          "call_id": null,
+          "vessel_type": null,
+          "dow": null,
+          "dow_compare": null,
+          "aggregation": null
+        },
+        "dates": {
+          "mode": "absolute",
+          "date_from": null,
+          "date_to": null,
+          "target_date": null
+        },
+        "result_states": [
+          "UNSUPPORTED"
+        ],
+        "coverage": "unsupported",
+        "boundary": null,
+        "required_values": [],
+        "required_terms": [
+          "outside AIS/port-call scope"
+        ],
+        "forbidden_claims": [
+          "utilization is",
+          "queue length is",
+          "productivity is",
+          "occupancy is",
+          "resolved voyage id"
+        ],
+        "forbid_numeric_answer": true
+      }
+    },
+    {
+      "case_id": "pcv3_057",
+      "prompt": "Give exact berth-level queue length for vessel arrivals at GDANSK.",
+      "normalized_prompt": "give exact berth-level queue length for vessel arrivals at gdansk.",
+      "source_tags": [
+        "legacy:unsupported_scope",
+        "ui:unsupported_scope"
+      ],
+      "source_expectations": [
+        "unsupported"
+      ],
+      "expectations": {
+        "intents": [
+          "G"
+        ],
+        "metric": "unsupported",
+        "entities": {
+          "ports": [
+            "PLGDN"
+          ],
+          "mmsi": null,
+          "call_id": null,
+          "vessel_type": null,
+          "dow": null,
+          "dow_compare": null,
+          "aggregation": null
+        },
+        "dates": {
+          "mode": "absolute",
+          "date_from": null,
+          "date_to": null,
+          "target_date": null
+        },
+        "result_states": [
+          "UNSUPPORTED"
+        ],
+        "coverage": "unsupported",
+        "boundary": null,
+        "required_values": [],
+        "required_terms": [
+          "outside AIS/port-call scope"
+        ],
+        "forbidden_claims": [
+          "utilization is",
+          "queue length is",
+          "productivity is",
+          "occupancy is",
+          "resolved voyage id"
+        ],
+        "forbid_numeric_answer": true
+      }
+    },
+    {
+      "case_id": "pcv3_058",
+      "prompt": "Show suspicious AIS jumps for MMSI 212575000 on 2021-01-01.",
+      "normalized_prompt": "show suspicious ais jumps for mmsi 212575000 on 2021-01-01.",
+      "source_tags": [
+        "catalog:vessel_investigation"
+      ],
+      "source_expectations": [
+        "COMPUTED"
+      ],
+      "expectations": {
+        "intents": [
+          "F"
+        ],
+        "metric": "ais_jump",
+        "entities": {
+          "ports": [],
+          "mmsi": "212575000",
+          "call_id": null,
+          "vessel_type": null,
+          "dow": null,
+          "dow_compare": null,
+          "aggregation": null
+        },
+        "dates": {
+          "mode": "absolute",
+          "date_from": "2021-01-01",
+          "date_to": "2021-01-01",
+          "target_date": "2021-01-01"
+        },
+        "result_states": [
+          "COMPUTED"
+        ],
+        "coverage": "complete",
+        "boundary": null,
+        "required_values": [],
+        "required_terms": [],
+        "forbidden_claims": [],
+        "forbid_numeric_answer": false
+      }
+    },
+    {
+      "case_id": "pcv3_059",
+      "prompt": "List AIS jump anomalies for MMSI 266232000 between 2021-01-01 and 2021-01-03.",
+      "normalized_prompt": "list ais jump anomalies for mmsi 266232000 between 2021-01-01 and 2021-01-03.",
+      "source_tags": [
+        "catalog:vessel_investigation"
+      ],
+      "source_expectations": [
+        "COMPUTED|NOT_COMPUTABLE"
+      ],
+      "expectations": {
+        "intents": [
+          "F"
+        ],
+        "metric": "ais_jump",
+        "entities": {
+          "ports": [],
+          "mmsi": "266232000",
+          "call_id": null,
+          "vessel_type": null,
+          "dow": null,
+          "dow_compare": null,
+          "aggregation": null
+        },
+        "dates": {
+          "mode": "absolute",
+          "date_from": "2021-01-01",
+          "date_to": "2021-01-03",
+          "target_date": null
+        },
+        "result_states": [
+          "COMPUTED"
+        ],
+        "coverage": "complete",
+        "boundary": null,
+        "required_values": [],
+        "required_terms": [],
+        "forbidden_claims": [],
+        "forbid_numeric_answer": false
+      }
+    },
+    {
+      "case_id": "pcv3_060",
+      "prompt": "Investigate unusual AIS jumps near SEGVX in March 2022.",
+      "normalized_prompt": "investigate unusual ais jumps near segvx in march 2022.",
+      "source_tags": [
+        "catalog:vessel_investigation"
+      ],
+      "source_expectations": [
+        "COMPUTED|RETRIEVAL_ONLY"
+      ],
+      "expectations": {
+        "intents": [
+          "F"
+        ],
+        "metric": "ais_jump",
+        "entities": {
+          "ports": [
+            "SEGVX"
+          ],
+          "mmsi": null,
+          "call_id": null,
+          "vessel_type": null,
+          "dow": null,
+          "dow_compare": null,
+          "aggregation": null
+        },
+        "dates": {
+          "mode": "absolute",
+          "date_from": "2022-03-01",
+          "date_to": "2022-03-31",
+          "target_date": null
+        },
+        "result_states": [
+          "COMPUTED"
+        ],
+        "coverage": "complete",
+        "boundary": null,
+        "required_values": [],
+        "required_terms": [],
+        "forbidden_claims": [],
+        "forbid_numeric_answer": false
+      }
+    },
+    {
+      "case_id": "pcv3_061",
+      "prompt": "Any suspicious spoofing-like jumps for MMSI 246650000 in March 2022?",
+      "normalized_prompt": "any suspicious spoofing-like jumps for mmsi 246650000 in march 2022?",
+      "source_tags": [
+        "catalog:vessel_investigation"
+      ],
+      "source_expectations": [
+        "COMPUTED|NOT_COMPUTABLE"
+      ],
+      "expectations": {
+        "intents": [
+          "F"
+        ],
+        "metric": "ais_jump",
+        "entities": {
+          "ports": [],
+          "mmsi": "246650000",
+          "call_id": null,
+          "vessel_type": null,
+          "dow": null,
+          "dow_compare": null,
+          "aggregation": null
+        },
+        "dates": {
+          "mode": "absolute",
+          "date_from": "2022-03-01",
+          "date_to": "2022-03-31",
+          "target_date": null
+        },
+        "result_states": [
+          "COMPUTED"
+        ],
+        "coverage": "complete",
+        "boundary": null,
+        "required_values": [],
+        "required_terms": [],
+        "forbidden_claims": [],
+        "forbid_numeric_answer": false
+      }
+    },
+    {
+      "case_id": "pcv3_062",
+      "prompt": "Resolve voyage for MMSI 245286000 departing 2021-01-01 and arriving 2021-01-02.",
+      "normalized_prompt": "resolve voyage for mmsi 245286000 departing 2021-01-01 and arriving 2021-01-02.",
+      "source_tags": [
+        "catalog:voyage_intelligence"
+      ],
+      "source_expectations": [
+        "COMPUTED|NOT_COMPUTABLE"
+      ],
+      "expectations": {
+        "intents": [
+          "G"
+        ],
+        "metric": "voyage",
+        "entities": {
+          "ports": [],
+          "mmsi": "245286000",
+          "call_id": null,
+          "vessel_type": null,
+          "dow": null,
+          "dow_compare": null,
+          "aggregation": null
+        },
+        "dates": {
+          "mode": "absolute",
+          "date_from": "2021-01-01",
+          "date_to": "2021-01-02",
+          "target_date": null
+        },
+        "result_states": [
+          "UNSUPPORTED"
+        ],
+        "coverage": "unsupported",
+        "boundary": null,
+        "required_values": [],
+        "required_terms": [
+          "retired Voyage Lab"
+        ],
+        "forbidden_claims": [
+          "utilization is",
+          "queue length is",
+          "productivity is",
+          "occupancy is",
+          "resolved voyage id"
+        ],
+        "forbid_numeric_answer": true
+      }
+    },
+    {
+      "case_id": "pcv3_063",
+      "prompt": "Show segment timeline for MMSI 266232000 in 2021-01.",
+      "normalized_prompt": "show segment timeline for mmsi 266232000 in 2021-01.",
+      "source_tags": [
+        "catalog:voyage_intelligence"
+      ],
+      "source_expectations": [
+        "COMPUTED|NOT_COMPUTABLE"
+      ],
+      "expectations": {
+        "intents": [
+          "G"
+        ],
+        "metric": "voyage",
+        "entities": {
+          "ports": [],
+          "mmsi": "266232000",
+          "call_id": null,
+          "vessel_type": null,
+          "dow": null,
+          "dow_compare": null,
+          "aggregation": null
+        },
+        "dates": {
+          "mode": "absolute",
+          "date_from": "2021-01-01",
+          "date_to": "2021-01-31",
+          "target_date": null
+        },
+        "result_states": [
+          "UNSUPPORTED"
+        ],
+        "coverage": "unsupported",
+        "boundary": null,
+        "required_values": [],
+        "required_terms": [
+          "retired Voyage Lab"
+        ],
+        "forbidden_claims": [
+          "utilization is",
+          "queue length is",
+          "productivity is",
+          "occupancy is",
+          "resolved voyage id"
+        ],
+        "forbid_numeric_answer": true
+      }
+    },
+    {
+      "case_id": "pcv3_064",
+      "prompt": "Resolve voyage from SEGOT to LVVNT for MMSI 246694000.",
+      "normalized_prompt": "resolve voyage from segot to lvvnt for mmsi 246694000.",
+      "source_tags": [
+        "catalog:voyage_intelligence"
+      ],
+      "source_expectations": [
+        "COMPUTED|NOT_COMPUTABLE"
+      ],
+      "expectations": {
+        "intents": [
+          "G"
+        ],
+        "metric": "voyage",
+        "entities": {
+          "ports": [
+            "SEGOT",
+            "LVVNT"
+          ],
+          "mmsi": "246694000",
+          "call_id": null,
+          "vessel_type": null,
+          "dow": null,
+          "dow_compare": null,
+          "aggregation": null
+        },
+        "dates": {
+          "mode": "absolute",
+          "date_from": null,
+          "date_to": null,
+          "target_date": null
+        },
+        "result_states": [
+          "UNSUPPORTED"
+        ],
+        "coverage": "unsupported",
+        "boundary": null,
+        "required_values": [],
+        "required_terms": [
+          "retired Voyage Lab"
+        ],
+        "forbidden_claims": [
+          "utilization is",
+          "queue length is",
+          "productivity is",
+          "occupancy is",
+          "resolved voyage id"
+        ],
+        "forbid_numeric_answer": true
+      }
+    },
+    {
+      "case_id": "pcv3_065",
+      "prompt": "Find voyage evidence for a vessel traveling from Poland to Karlskrona in March 2022.",
+      "normalized_prompt": "find voyage evidence for a vessel traveling from poland to karlskrona in march 2022.",
+      "source_tags": [
+        "catalog:voyage_intelligence"
+      ],
+      "source_expectations": [
+        "COMPUTED|NOT_COMPUTABLE"
+      ],
+      "expectations": {
+        "intents": [
+          "G"
+        ],
+        "metric": "voyage",
+        "entities": {
+          "ports": [
+            "SEKAA"
+          ],
+          "mmsi": null,
+          "call_id": null,
+          "vessel_type": null,
+          "dow": null,
+          "dow_compare": null,
+          "aggregation": null
+        },
+        "dates": {
+          "mode": "absolute",
+          "date_from": "2022-03-01",
+          "date_to": "2022-03-31",
+          "target_date": null
+        },
+        "result_states": [
+          "UNSUPPORTED"
+        ],
+        "coverage": "unsupported",
+        "boundary": null,
+        "required_values": [],
+        "required_terms": [
+          "retired Voyage Lab"
+        ],
+        "forbidden_claims": [
+          "utilization is",
+          "queue length is",
+          "productivity is",
+          "occupancy is",
+          "resolved voyage id"
+        ],
+        "forbid_numeric_answer": true
+      }
+    },
+    {
+      "case_id": "pcv3_066",
+      "prompt": "Resolve voyage for unknown MMSI 999999999.",
+      "normalized_prompt": "resolve voyage for unknown mmsi 999999999.",
+      "source_tags": [
+        "catalog:voyage_intelligence"
+      ],
+      "source_expectations": [
+        "NOT_COMPUTABLE"
+      ],
+      "expectations": {
+        "intents": [
+          "G"
+        ],
+        "metric": "voyage",
+        "entities": {
+          "ports": [],
+          "mmsi": "999999999",
+          "call_id": null,
+          "vessel_type": null,
+          "dow": null,
+          "dow_compare": null,
+          "aggregation": null
+        },
+        "dates": {
+          "mode": "absolute",
+          "date_from": null,
+          "date_to": null,
+          "target_date": null
+        },
+        "result_states": [
+          "UNSUPPORTED"
+        ],
+        "coverage": "unsupported",
+        "boundary": null,
+        "required_values": [],
+        "required_terms": [
+          "retired Voyage Lab"
+        ],
+        "forbidden_claims": [
+          "utilization is",
+          "queue length is",
+          "productivity is",
+          "occupancy is",
+          "resolved voyage id"
+        ],
+        "forbid_numeric_answer": true
+      }
+    },
+    {
+      "case_id": "pcv3_067",
+      "prompt": "Show WTW CO2e emissions at UNKNOWNPORT between 2022-02-01 and 2022-02-28.",
+      "normalized_prompt": "show wtw co2e emissions at unknownport between 2022-02-01 and 2022-02-28.",
+      "source_tags": [
+        "catalog:carbon_retrieval_or_no_data"
+      ],
+      "source_expectations": [
+        "NOT_COMPUTABLE|RETRIEVAL_ONLY"
+      ],
+      "expectations": {
+        "intents": [
+          "H"
+        ],
+        "metric": "emissions",
+        "entities": {
+          "ports": [
+            "UNKNOWNPORT"
+          ],
+          "mmsi": null,
+          "call_id": null,
+          "vessel_type": null,
+          "dow": null,
+          "dow_compare": null,
+          "aggregation": null
+        },
+        "dates": {
+          "mode": "absolute",
+          "date_from": "2022-02-01",
+          "date_to": "2022-02-28",
+          "target_date": null
+        },
+        "result_states": [
+          "NOT_COMPUTABLE",
+          "RETRIEVAL_ONLY"
+        ],
+        "coverage": "unavailable",
+        "boundary": "WTW",
+        "required_values": [],
+        "required_terms": [],
+        "forbidden_claims": [],
+        "forbid_numeric_answer": false
+      }
+    },
+    {
+      "case_id": "pcv3_068",
+      "prompt": "What are emissions at LVVNT for 2035-01-01 to 2035-01-31?",
+      "normalized_prompt": "what are emissions at lvvnt for 2035-01-01 to 2035-01-31?",
+      "source_tags": [
+        "catalog:carbon_retrieval_or_no_data"
+      ],
+      "source_expectations": [
+        "NOT_COMPUTABLE|RETRIEVAL_ONLY"
+      ],
+      "expectations": {
+        "intents": [
+          "H"
+        ],
+        "metric": "emissions",
+        "entities": {
+          "ports": [
+            "LVVNT"
+          ],
+          "mmsi": null,
+          "call_id": null,
+          "vessel_type": null,
+          "dow": null,
+          "dow_compare": null,
+          "aggregation": null
+        },
+        "dates": {
+          "mode": "absolute",
+          "date_from": "2035-01-01",
+          "date_to": "2035-01-31",
+          "target_date": null
+        },
+        "result_states": [
+          "NOT_COMPUTABLE",
+          "RETRIEVAL_ONLY"
+        ],
+        "coverage": "unavailable",
+        "boundary": "TTW",
+        "required_values": [],
+        "required_terms": [],
+        "forbidden_claims": [],
+        "forbid_numeric_answer": false
+      }
+    },
+    {
+      "case_id": "pcv3_069",
+      "prompt": "Give carbon evidence IDs for port with no deterministic rows.",
+      "normalized_prompt": "give carbon evidence ids for port with no deterministic rows.",
+      "source_tags": [
+        "catalog:carbon_retrieval_or_no_data"
+      ],
+      "source_expectations": [
+        "NOT_COMPUTABLE|RETRIEVAL_ONLY"
+      ],
+      "expectations": {
+        "intents": [
+          "H"
+        ],
+        "metric": "emissions",
+        "entities": {
+          "ports": [],
+          "mmsi": null,
+          "call_id": null,
+          "vessel_type": null,
+          "dow": null,
+          "dow_compare": null,
+          "aggregation": null
+        },
+        "dates": {
+          "mode": "absolute",
+          "date_from": null,
+          "date_to": null,
+          "target_date": null
+        },
+        "result_states": [
+          "NOT_COMPUTABLE",
+          "RETRIEVAL_ONLY"
+        ],
+        "coverage": "unavailable",
+        "boundary": "TTW",
+        "required_values": [],
+        "required_terms": [],
+        "forbidden_claims": [],
+        "forbid_numeric_answer": false
+      }
+    },
+    {
+      "case_id": "pcv3_070",
+      "prompt": "Predict carbon emissions next Friday at SEGOT.",
+      "normalized_prompt": "predict carbon emissions next friday at segot.",
+      "source_tags": [
+        "catalog:carbon_retrieval_or_no_data"
+      ],
+      "source_expectations": [
+        "FORECAST_ONLY|NOT_COMPUTABLE"
+      ],
+      "expectations": {
+        "intents": [
+          "H"
+        ],
+        "metric": "emissions",
+        "entities": {
+          "ports": [
+            "SEGOT"
+          ],
+          "mmsi": null,
+          "call_id": null,
+          "vessel_type": null,
+          "dow": "Friday",
+          "dow_compare": null,
+          "aggregation": null
+        },
+        "dates": {
+          "mode": "relative",
+          "date_from": null,
+          "date_to": null,
+          "target_date": null
+        },
+        "result_states": [
+          "FORECAST_ONLY"
+        ],
+        "coverage": "forecast",
+        "boundary": "TTW",
+        "required_values": [],
+        "required_terms": [
+          "forecast outputs are not available"
+        ],
+        "forbidden_claims": [],
+        "forbid_numeric_answer": false
+      }
+    },
+    {
+      "case_id": "pcv3_071",
+      "prompt": "How many vessel arrivals were recorded at Gothenburg in March 2022?",
+      "normalized_prompt": "how many vessel arrivals were recorded at gothenburg in march 2022?",
+      "source_tags": [
+        "paper:critical"
+      ],
+      "source_expectations": [],
+      "expectations": {
+        "intents": [
+          "A"
+        ],
+        "metric": "arrivals_vessels",
+        "entities": {
+          "ports": [
+            "SEGOT"
+          ],
+          "mmsi": null,
+          "call_id": null,
+          "vessel_type": null,
+          "dow": null,
+          "dow_compare": null,
+          "aggregation": null
+        },
+        "dates": {
+          "mode": "absolute",
+          "date_from": "2022-03-01",
+          "date_to": "2022-03-31",
+          "target_date": null
+        },
+        "result_states": [
+          "COMPUTED"
+        ],
+        "coverage": "complete",
+        "boundary": null,
+        "required_values": [
+          {
+            "name": "arrival_count",
+            "value": 488,
+            "tolerance": 0
+          },
+          {
+            "name": "day_buckets",
+            "value": 31,
+            "tolerance": 0
+          }
+        ],
+        "required_terms": [],
+        "forbidden_claims": [],
+        "forbid_numeric_answer": false
+      }
+    },
+    {
+      "case_id": "pcv3_072",
+      "prompt": "Total vessel arrivals at Gothenburg in March 2022?",
+      "normalized_prompt": "total vessel arrivals at gothenburg in march 2022?",
+      "source_tags": [
+        "paper:critical"
+      ],
+      "source_expectations": [],
+      "expectations": {
+        "intents": [
+          "A"
+        ],
+        "metric": "arrival_count",
+        "entities": {
+          "ports": [
+            "SEGOT"
+          ],
+          "mmsi": null,
+          "call_id": null,
+          "vessel_type": null,
+          "dow": null,
+          "dow_compare": null,
+          "aggregation": null
+        },
+        "dates": {
+          "mode": "absolute",
+          "date_from": "2022-03-01",
+          "date_to": "2022-03-31",
+          "target_date": null
+        },
+        "result_states": [
+          "COMPUTED"
+        ],
+        "coverage": "complete",
+        "boundary": null,
+        "required_values": [
+          {
+            "name": "arrival_count",
+            "value": 488,
+            "tolerance": 0
+          },
+          {
+            "name": "day_buckets",
+            "value": 31,
+            "tolerance": 0
+          }
+        ],
+        "required_terms": [],
+        "forbidden_claims": [],
+        "forbid_numeric_answer": false
+      }
+    },
+    {
+      "case_id": "pcv3_073",
+      "prompt": "How many vessel arrivals were recorded at Karlshamn and Gothenburg in March 2022?",
+      "normalized_prompt": "how many vessel arrivals were recorded at karlshamn and gothenburg in march 2022?",
+      "source_tags": [
+        "paper:critical"
+      ],
+      "source_expectations": [],
+      "expectations": {
+        "intents": [
+          "A"
+        ],
+        "metric": "arrival_count",
+        "entities": {
+          "ports": [
+            "SEKAN",
+            "SEGOT"
+          ],
+          "mmsi": null,
+          "call_id": null,
+          "vessel_type": null,
+          "dow": null,
+          "dow_compare": null,
+          "aggregation": null
+        },
+        "dates": {
+          "mode": "absolute",
+          "date_from": "2022-03-01",
+          "date_to": "2022-03-31",
+          "target_date": null
+        },
+        "result_states": [
+          "COMPUTED"
+        ],
+        "coverage": "complete",
+        "boundary": null,
+        "required_values": [
+          {
+            "name": "combined_arrival_count",
+            "value": 560,
+            "tolerance": 0
+          }
+        ],
+        "required_terms": [],
+        "forbidden_claims": [],
+        "forbid_numeric_answer": false
+      }
+    },
+    {
+      "case_id": "pcv3_074",
+      "prompt": "According to port-call records, show daily arrival counts at LVVNT between 2022-02-01 and 2022-02-28.",
+      "normalized_prompt": "according to port-call records, show daily arrival counts at lvvnt between 2022-02-01 and 2022-02-28.",
+      "source_tags": [
+        "paper:critical"
+      ],
+      "source_expectations": [],
+      "expectations": {
+        "intents": [
+          "A"
+        ],
+        "metric": "arrivals_vessels",
+        "entities": {
+          "ports": [
+            "LVVNT"
+          ],
+          "mmsi": null,
+          "call_id": null,
+          "vessel_type": null,
+          "dow": null,
+          "dow_compare": null,
+          "aggregation": null
+        },
+        "dates": {
+          "mode": "absolute",
+          "date_from": "2022-02-01",
+          "date_to": "2022-02-28",
+          "target_date": null
+        },
+        "result_states": [
+          "COMPUTED"
+        ],
+        "coverage": "complete",
+        "boundary": null,
+        "required_values": [
+          {
+            "name": "arrivals_vessels",
+            "value": 58,
+            "tolerance": 0
+          },
+          {
+            "name": "day_buckets",
+            "value": 25,
+            "tolerance": 0
+          }
+        ],
+        "required_terms": [
+          "port-call"
+        ],
+        "forbidden_claims": [],
+        "forbid_numeric_answer": false
+      }
+    },
+    {
+      "case_id": "pcv3_075",
+      "prompt": "According to port-call records, how many tanker arrivals were recorded at LVVNT between 2022-03-01 and 2022-03-10?",
+      "normalized_prompt": "according to port-call records, how many tanker arrivals were recorded at lvvnt between 2022-03-01 and 2022-03-10?",
+      "source_tags": [
+        "paper:critical"
+      ],
+      "source_expectations": [],
+      "expectations": {
+        "intents": [
+          "A"
+        ],
+        "metric": "arrivals_vessels",
+        "entities": {
+          "ports": [
+            "LVVNT"
+          ],
+          "mmsi": null,
+          "call_id": null,
+          "vessel_type": "tanker",
+          "dow": null,
+          "dow_compare": null,
+          "aggregation": null
+        },
+        "dates": {
+          "mode": "absolute",
+          "date_from": "2022-03-01",
+          "date_to": "2022-03-10",
+          "target_date": null
+        },
+        "result_states": [
+          "COMPUTED"
+        ],
+        "coverage": "complete",
+        "boundary": null,
+        "required_values": [
+          {
+            "name": "tanker_arrivals",
+            "value": 7,
+            "tolerance": 0
+          },
+          {
+            "name": "day_buckets",
+            "value": 5,
+            "tolerance": 0
+          }
+        ],
+        "required_terms": [
+          "port-call"
+        ],
+        "forbidden_claims": [],
+        "forbid_numeric_answer": false
+      }
+    }
+  ]
+}

@@ -1,49 +1,29 @@
-__pycache__/
-*.pyc
-.venv/
-.venv311/
-.venv_py314_backup/
 .env
+.env.*
+!.env.example
+
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+web/node_modules/
+web/dist/
+web/test-results/
+web/playwright-report/
+web/.vite/
+
+data/chroma/
+demo_data/chroma/
+data/processed/carbon_exports/
+data/raw/
+data/runtime/
+data/processed/
+thesis/
+artifacts/
+packages/
+test-results/
+*.single-incomplete
+*.log
 .DS_Store
-
-# Data artifacts
-data/*
-!data/.gitkeep
-
-# Chroma persistence
-chroma/
-!demo_data/chroma/
-!demo_data/chroma/**
-
-# Streamlit
-.streamlit/
-
-# Archives and packaging artifacts
-*.zip
-dist/
-
-# Local meeting/thesis notes packs
-meeting_pack/
-meeting_pack_chatgpt/
-THESIS_BLUEPRINT.md
-THESIS_README.md
-run_thesis_pipeline.sh
-
-# Thesis-only implementation artifacts
-src/thesis/
-evaluation/thesis/
-
-# Generated local model artifacts
-models/*
-!models/.gitkeep
-
-# Local tunnel/runtime scratch artifacts
-.eagle_*.log
-.eagle_*.pid
-.streamlit_local.log
-imported_projects/
-
-# UI review generated artifacts
-review/latest/
-review/runs/
-review/logs/

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import math
 import os
+import re
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Dict, Iterable, List, Optional, Sequence
@@ -14,7 +15,7 @@ from openai import OpenAI
 from src.utils.config import load_config
 from src.utils.serialization import normalize_destination, normalize_identifier
 from src.utils.time import in_date_range
-from src.utils.runtime import create_chroma_client, import_chromadb, require_openai_api_key
+from src.utils.runtime import create_chroma_client, import_chromadb
 
 
 def _normalize_vessel_type(value: str) -> str:
@@ -134,6 +135,7 @@ class RetrievalResult:
     mode: str
     evidence: List[EvidenceItem]
     where_filter: Optional[Dict[str, Any]]
+    backend: str = "unknown"
 
     @property
     def min_distance(self) -> Optional[float]:
@@ -156,16 +158,31 @@ class RAGRetriever:
             persist_dir=self.persist_dir,
             config=self.config,
         )
-        self.openai = OpenAI(api_key=require_openai_api_key())
+        requested_provider = str(
+            os.getenv(
+                "EAGLE_EYE_RETRIEVAL_PROVIDER",
+                self.config.get("retrieval", {}).get("provider", "auto"),
+            )
+        ).strip().lower()
+        if requested_provider not in {"auto", "openai", "lexical"}:
+            raise ValueError("EAGLE_EYE_RETRIEVAL_PROVIDER must be auto, openai, or lexical")
+        api_key = os.getenv("OPENAI_API_KEY", "").strip()
+        if requested_provider == "openai" and not api_key:
+            raise RuntimeError("OpenAI retrieval was explicitly selected, but OPENAI_API_KEY is not set.")
+        self.openai: Optional[OpenAI] = OpenAI(api_key=api_key) if api_key and requested_provider != "lexical" else None
+        self.query_backend = "openai_embedding" if self.openai is not None else "local_lexical"
         self.embedding_model = self.config["models"]["embedding_model"]
-        self.top_k = int(top_k or self.config["retrieval"].get("top_k", 8))
+        self.top_k = int(top_k if top_k is not None else self.config["retrieval"].get("top_k", 5))
         self.prefilter_candidate_limit = int(
             self.config["retrieval"].get("bbox_candidate_limit", 20000)
         )
-        self.traffic_collection = self.client.get_or_create_collection(
+        self.local_scan_limit = int(self.config["retrieval"].get("local_lexical_scan_limit", 10000))
+        # Query runtime is read-only: an absent collection is an initialization
+        # error, never an excuse to create an empty index during a user query.
+        self.traffic_collection = self.client.get_collection(
             name=self.config["index"]["traffic_collection"]
         )
-        self.docs_collection = self.client.get_or_create_collection(
+        self.docs_collection = self.client.get_collection(
             name=self.config["index"]["docs_collection"]
         )
         metadata_override = os.getenv("TRAFFIC_METADATA_INDEX_PATH", "").strip()
@@ -175,18 +192,351 @@ class RAGRetriever:
             else self.persist_dir / "traffic_metadata_index.csv"
         )
         self._metadata_df: Optional[pd.DataFrame] = None
+        self._docs_lexical_cache: Optional[
+            tuple[List[str], List[str], List[Dict[str, Any]]]
+        ] = None
+        # The local traffic index is intentionally loaded once at startup.  A
+        # query must not walk thousands of Chroma rows just to perform lexical
+        # matching; filtering this slim dataframe is both faster and exact for
+        # late coverage dates that do not occur in the first N vector rows.
+        if self.openai is None and bool(
+            self.config.get("retrieval", {}).get("preload_local_metadata", True)
+        ):
+            self._load_metadata_df()
 
     def _embed_query(self, question: str) -> List[float]:
+        if self.openai is None:
+            raise RuntimeError("Remote embeddings are unavailable in local lexical retrieval mode.")
         response = self.openai.embeddings.create(model=self.embedding_model, input=[question])
         return response.data[0].embedding
+
+    @property
+    def retrieval_backend(self) -> str:
+        return f"{self.vector_backend}:{self.query_backend}"
+
+    @staticmethod
+    def _requested_top_k(top_k: Optional[int], default: int) -> int:
+        return max(0, int(default if top_k is None else top_k))
+
+    @staticmethod
+    def _lexical_tokens(value: Any) -> List[str]:
+        stopwords = {
+            "a", "an", "and", "are", "at", "be", "between", "by", "for", "from", "how",
+            "in", "is", "it", "of", "on", "or", "show", "the", "to", "was", "what", "which",
+            "with", "were", "will",
+        }
+        tokens = re.findall(r"[a-z0-9][a-z0-9_.:-]*", str(value or "").lower())
+        return [token for token in tokens if token not in stopwords and len(token) > 1]
+
+    def _lexical_rank(
+        self,
+        *,
+        question: str,
+        ids: Sequence[str],
+        documents: Sequence[str],
+        metadatas: Sequence[Dict[str, Any]],
+        source_kind: str,
+        top_k: int,
+        allow_structured_zero_score: bool = False,
+    ) -> List[EvidenceItem]:
+        if top_k <= 0:
+            return []
+        query_tokens = self._lexical_tokens(question)
+        query_set = set(query_tokens)
+        anchors = self._lexical_anchors(question)
+        candidates: List[
+            tuple[str, str, Dict[str, Any], Dict[str, int], str]
+        ] = []
+        document_frequency = {token: 0 for token in query_set}
+        for index, doc_id in enumerate(ids):
+            document = str(documents[index] if index < len(documents) else "")
+            metadata = (
+                metadatas[index]
+                if index < len(metadatas) and isinstance(metadatas[index], dict)
+                else {}
+            )
+            metadata_text = " ".join(
+                str(metadata.get(field, ""))
+                for field in (
+                    "source_file",
+                    "title",
+                    "locode",
+                    "locode_norm",
+                    "port_name",
+                    "port_name_norm",
+                    "mmsi",
+                    "imo",
+                    "vessel_type",
+                    "vessel_type_norm",
+                    "destination",
+                    "destination_norm",
+                    "timestamp_date",
+                    "timestamp_full",
+                    "event_kind",
+                )
+            )
+            candidate_text = f"{document} {metadata_text}".lower()
+            # Explicit codes and identifiers are grounding constraints, not
+            # optional ranking hints.  A SOLAS question must never be answered
+            # from a NIS2 chunk merely because both contain "require".
+            if anchors and any(
+                re.search(rf"(?<![a-z0-9]){re.escape(anchor)}(?![a-z0-9])", candidate_text)
+                is None
+                for anchor in anchors
+            ):
+                continue
+            candidate_tokens = self._lexical_tokens(candidate_text)
+            token_counts: Dict[str, int] = {}
+            for token in candidate_tokens:
+                token_counts[token] = token_counts.get(token, 0) + 1
+            for token in query_set:
+                if token in token_counts:
+                    document_frequency[token] += 1
+            candidates.append((str(doc_id), document, dict(metadata), token_counts, " ".join(candidate_tokens)))
+
+        population = max(1, len(candidates))
+        ranked: List[tuple[float, EvidenceItem]] = []
+        for doc_id, document, metadata, token_counts, normalized_document in candidates:
+            matched = [token for token in query_set if token in token_counts]
+            score = sum(
+                (math.log((population + 1.0) / (document_frequency[token] + 1.0)) + 1.0)
+                * (1.0 + math.log1p(token_counts[token]))
+                for token in matched
+            )
+            normalized_question = " ".join(query_tokens)
+            if normalized_question and normalized_question in normalized_document:
+                score += 4.0
+            # Without a structured traffic scope or an explicit anchor, one
+            # generic word is not enough to claim relevant source grounding.
+            strong_single_match = any(
+                len(token) >= 8
+                and document_frequency[token] <= max(2, int(population * 0.1))
+                for token in matched
+            )
+            if (
+                score <= 0
+                or (
+                    not allow_structured_zero_score
+                    and not anchors
+                    and len(matched) < 2
+                    and not strong_single_match
+                )
+            ):
+                continue
+            distance = 1.0 / (1.0 + max(0.0, score))
+            ranked.append(
+                (
+                    score,
+                    EvidenceItem(
+                        id=str(doc_id),
+                        text=document,
+                        metadata=dict(metadata),
+                        source_kind=source_kind,
+                        distance=distance,
+                    ),
+                )
+            )
+        ranked.sort(key=lambda item: (-item[0], item[1].id))
+        return [item for _, item in ranked[:top_k]]
+
+    @staticmethod
+    def _lexical_anchors(question: str) -> List[str]:
+        """Return explicit identifiers that every accepted chunk must contain."""
+
+        text = str(question or "")
+        known = {
+            "emsa",
+            "eur-lex",
+            "ilo",
+            "imo",
+            "isps",
+            "locode",
+            "mmsi",
+            "nis2",
+            "solas",
+        }
+        anchors = {
+            token.lower()
+            for token in re.findall(r"[A-Za-z0-9][A-Za-z0-9_-]*", text)
+            if token.lower() in known
+        }
+        for token in re.findall(r"\b[A-Z][A-Z0-9]{2,11}\b", text):
+            lowered = token.lower()
+            if any(char.isdigit() for char in token) or len(token) == 5:
+                if lowered not in {"about", "march", "show", "today", "which"}:
+                    anchors.add(lowered)
+        anchors.update(match.lower() for match in re.findall(r"\b(?:19|20)\d{2}(?:-\d{2}(?:-\d{2})?)?\b", text))
+        anchors.update(re.findall(r"\b\d{6,9}\b", text))
+        return sorted(anchors)
+
+    def _get_collection_candidates(
+        self,
+        collection: Any,
+        *,
+        where: Optional[Dict[str, Any]],
+        max_rows: int,
+    ) -> tuple[List[str], List[str], List[Dict[str, Any]]]:
+        ids: List[str] = []
+        documents: List[str] = []
+        metadatas: List[Dict[str, Any]] = []
+        offset = 0
+        page_size = 1000
+        while len(ids) < max_rows:
+            limit = min(page_size, max_rows - len(ids))
+            payload = collection.get(
+                where=where,
+                limit=limit,
+                offset=offset,
+                include=["documents", "metadatas"],
+            )
+            page_ids = list(payload.get("ids") or [])
+            if not page_ids:
+                break
+            page_documents = list(payload.get("documents") or [])
+            page_metadatas = list(payload.get("metadatas") or [])
+            ids.extend(str(value) for value in page_ids)
+            documents.extend(str(value or "") for value in page_documents)
+            metadatas.extend(dict(value or {}) for value in page_metadatas)
+            if len(page_ids) < limit:
+                break
+            offset += len(page_ids)
+        return ids, documents, metadatas
 
     def _load_metadata_df(self) -> Optional[pd.DataFrame]:
         if self._metadata_df is not None:
             return self._metadata_df
         if not self.metadata_index_path.exists():
             return None
-        self._metadata_df = pd.read_csv(self.metadata_index_path, low_memory=False)
+        wanted = {
+            "stable_id",
+            "mmsi",
+            "imo",
+            "flag_norm",
+            "vessel_type_norm",
+            "nav_status_norm",
+            "destination_norm",
+            "port_name_norm",
+            "locode_norm",
+            "timestamp_date",
+            "timestamp_full",
+            "latitude",
+            "longitude",
+            "source_file",
+            "event_kind",
+        }
+        # The production metadata CSV is hundreds of MB. Loading both the full
+        # serialized event and its bounded excerpt inflated the UI process to
+        # several GB. Prefer the excerpt and use full text only for a legacy
+        # index that does not contain excerpts.
+        available = set(pd.read_csv(self.metadata_index_path, nrows=0).columns)
+        text_field = (
+            "serialized_excerpt"
+            if "serialized_excerpt" in available
+            else "serialized_text"
+            if "serialized_text" in available
+            else None
+        )
+        selected = wanted & available
+        if text_field:
+            selected.add(text_field)
+        string_columns = {
+            # Object strings avoid invoking PyArrow's native scalar comparison
+            # path from Streamlit's script thread (a reproducible macOS
+            # segfault), while the bounded column set keeps memory controlled.
+            name: object
+            for name in selected
+            if name not in {"latitude", "longitude"}
+        }
+        self._metadata_df = pd.read_csv(
+            self.metadata_index_path,
+            usecols=lambda name: name in selected,
+            dtype=string_columns,
+            low_memory=True,
+        )
         return self._metadata_df
+
+    @staticmethod
+    def _sample_frame(frame: pd.DataFrame, limit: int) -> pd.DataFrame:
+        if limit <= 0 or len(frame) <= limit:
+            return frame
+        stride = max(1, math.ceil(len(frame) / limit))
+        return frame.iloc[::stride].head(limit)
+
+    @staticmethod
+    def _python_text_values(series: pd.Series) -> List[str]:
+        """Convert scalars without constructing pandas' Arrow string array."""
+
+        return ["" if pd.isna(value) else str(value) for value in series.tolist()]
+
+    @staticmethod
+    def _traffic_document_from_metadata(metadata: Dict[str, Any]) -> str:
+        """Create a faithful excerpt when an older metadata index has no text column."""
+
+        labels = (
+            ("timestamp", "timestamp_full"),
+            ("date", "timestamp_date"),
+            ("MMSI", "mmsi"),
+            ("IMO", "imo"),
+            ("LOCODE", "locode_norm"),
+            ("port", "port_name_norm"),
+            ("vessel type", "vessel_type_norm"),
+            ("destination", "destination_norm"),
+            ("navigation status", "nav_status_norm"),
+            ("latitude", "latitude"),
+            ("longitude", "longitude"),
+            ("event", "event_kind"),
+            ("source", "source_file"),
+        )
+        values: List[str] = []
+        for label, field in labels:
+            value = metadata.get(field)
+            if value is None or pd.isna(value):
+                continue
+            text = str(value).strip()
+            if text and text.lower() not in {"nan", "none", "<na>"}:
+                values.append(f"{label}: {text}")
+        return "AIS event | " + " | ".join(values)
+
+    def _prefilter_candidate_frame(self, filters: QueryFilters) -> Optional[pd.DataFrame]:
+        df = self._load_metadata_df()
+        if df is None or df.empty:
+            return None
+        mask = self._metadata_filter_mask(df, filters)
+        return df.loc[mask]
+
+    @staticmethod
+    def _metadata_filter_mask(df: pd.DataFrame, filters: QueryFilters) -> pd.Series:
+        f = filters.normalized()
+        mask = pd.Series(True, index=df.index)
+        if f.mmsi and "mmsi" in df.columns:
+            mask &= df["mmsi"].eq(f.mmsi)
+        if f.imo and "imo" in df.columns:
+            mask &= df["imo"].eq(f.imo)
+        if f.locode and "locode_norm" in df.columns:
+            mask &= df["locode_norm"].eq(f.locode)
+        if f.port_name and "port_name_norm" in df.columns:
+            mask &= df["port_name_norm"].eq(f.port_name)
+        if f.vessel_type and "vessel_type_norm" in df.columns:
+            mask &= df["vessel_type_norm"].eq(f.vessel_type)
+        if f.flag and "flag_norm" in df.columns:
+            mask &= df["flag_norm"].eq(f.flag)
+        if f.destination and "destination_norm" in df.columns:
+            mask &= df["destination_norm"].eq(f.destination)
+        if f.nav_status and "nav_status_norm" in df.columns:
+            mask &= df["nav_status_norm"].eq(f.nav_status)
+        if f.date_from and "timestamp_date" in df.columns:
+            mask &= df["timestamp_date"].ge(f.date_from)
+        if f.date_to and "timestamp_date" in df.columns:
+            mask &= df["timestamp_date"].le(f.date_to)
+        if f.lat_min is not None and "latitude" in df.columns:
+            mask &= pd.to_numeric(df["latitude"], errors="coerce") >= f.lat_min
+        if f.lat_max is not None and "latitude" in df.columns:
+            mask &= pd.to_numeric(df["latitude"], errors="coerce") <= f.lat_max
+        if f.lon_min is not None and "longitude" in df.columns:
+            mask &= pd.to_numeric(df["longitude"], errors="coerce") >= f.lon_min
+        if f.lon_max is not None and "longitude" in df.columns:
+            mask &= pd.to_numeric(df["longitude"], errors="coerce") <= f.lon_max
+        return mask.fillna(False)
 
     def _metadata_df_from_collection(
         self,
@@ -290,50 +640,21 @@ class RAGRetriever:
             return False
         return True
 
-    def _prefilter_candidate_ids(self, filters: QueryFilters) -> Optional[List[str]]:
+    def _prefilter_candidate_ids(
+        self,
+        filters: QueryFilters,
+        *,
+        limit: Optional[int] = None,
+    ) -> Optional[List[str]]:
         df = self._load_metadata_df()
         if df is None or df.empty:
             return None
-
-        f = filters.normalized()
-        mask = pd.Series(True, index=df.index)
-        if f.mmsi and "mmsi" in df.columns:
-            mask &= df["mmsi"].astype(str).str.strip() == f.mmsi
-        if f.imo and "imo" in df.columns:
-            mask &= df["imo"].astype(str).str.strip() == f.imo
-        if f.locode and "locode_norm" in df.columns:
-            mask &= (
-                df["locode_norm"].astype(str).str.upper().str.replace(" ", "", regex=False)
-                == f.locode
-            )
-        if f.port_name and "port_name_norm" in df.columns:
-            mask &= df["port_name_norm"].astype(str).str.lower() == f.port_name
-        if f.vessel_type and "vessel_type_norm" in df.columns:
-            mask &= df["vessel_type_norm"].astype(str).str.lower() == f.vessel_type
-        if f.flag and "flag_norm" in df.columns:
-            mask &= df["flag_norm"].astype(str).str.upper() == f.flag
-        if f.destination and "destination_norm" in df.columns:
-            mask &= df["destination_norm"].astype(str).str.upper() == f.destination
-        if f.nav_status and "nav_status_norm" in df.columns:
-            mask &= df["nav_status_norm"].astype(str).str.lower() == f.nav_status
-        if f.date_from and "timestamp_date" in df.columns:
-            mask &= df["timestamp_date"].astype(str) >= f.date_from
-        if f.date_to and "timestamp_date" in df.columns:
-            mask &= df["timestamp_date"].astype(str) <= f.date_to
-        if f.lat_min is not None and "latitude" in df.columns:
-            mask &= pd.to_numeric(df["latitude"], errors="coerce") >= f.lat_min
-        if f.lat_max is not None and "latitude" in df.columns:
-            mask &= pd.to_numeric(df["latitude"], errors="coerce") <= f.lat_max
-        if f.lon_min is not None and "longitude" in df.columns:
-            mask &= pd.to_numeric(df["longitude"], errors="coerce") >= f.lon_min
-        if f.lon_max is not None and "longitude" in df.columns:
-            mask &= pd.to_numeric(df["longitude"], errors="coerce") <= f.lon_max
-
-        filtered = df[mask]
+        filtered = df[self._metadata_filter_mask(df, filters)]
         if filtered.empty or "stable_id" not in filtered.columns:
             return []
         ids = filtered["stable_id"].astype(str).tolist()
-        return ids[: self.prefilter_candidate_limit]
+        effective_limit = self.prefilter_candidate_limit if limit is None else max(0, int(limit))
+        return ids[:effective_limit] if effective_limit else ids
 
     def _rank_candidates_by_similarity(
         self, query_embedding: Sequence[float], candidate_ids: Sequence[str], top_k: int
@@ -369,11 +690,94 @@ class RAGRetriever:
         self, question: str, filters: QueryFilters, top_k: Optional[int] = None
     ) -> RetrievalResult:
         where = self._build_where(filters)
-        available = self.traffic_collection.count()
+        requested_top_k = self._requested_top_k(top_k, self.top_k)
+        if requested_top_k == 0:
+            return RetrievalResult(
+                mode="traffic",
+                evidence=[],
+                where_filter=where,
+                backend=self.retrieval_backend,
+            )
+        # Local lexical traffic queries use the metadata index directly.  Do
+        # not pay Chroma's cold `count()` cost on the analytics request path.
+        available = (
+            len(self._metadata_df)
+            if self.openai is None and self._metadata_df is not None
+            else self.traffic_collection.count()
+        )
         if available == 0:
-            return RetrievalResult(mode="traffic", evidence=[], where_filter=where)
+            return RetrievalResult(
+                mode="traffic",
+                evidence=[],
+                where_filter=where,
+                backend=self.retrieval_backend,
+            )
 
-        requested_top_k = int(top_k or self.top_k)
+        if self.openai is None:
+            candidate_frame = self._prefilter_candidate_frame(filters)
+            if candidate_frame is not None:
+                if candidate_frame.empty:
+                    return RetrievalResult(
+                        mode="traffic",
+                        evidence=[],
+                        where_filter={"prefilter_candidates": 0},
+                        backend=self.retrieval_backend,
+                    )
+                total_candidates = len(candidate_frame)
+                candidate_frame = self._sample_frame(candidate_frame, self.local_scan_limit)
+                ids = self._python_text_values(candidate_frame["stable_id"])
+                metadata_fields = [
+                    field
+                    for field in candidate_frame.columns
+                    if field not in {"stable_id", "serialized_excerpt", "serialized_text"}
+                ]
+                metadatas = candidate_frame[metadata_fields].to_dict(orient="records")
+                text_field = next(
+                    (
+                        field
+                        for field in ("serialized_excerpt", "serialized_text")
+                        if field in candidate_frame.columns
+                    ),
+                    None,
+                )
+                if text_field:
+                    documents = self._python_text_values(candidate_frame[text_field])
+                else:
+                    documents = [
+                        self._traffic_document_from_metadata(metadata)
+                        for metadata in metadatas
+                    ]
+            else:
+                total_candidates = min(available, self.local_scan_limit)
+                ids, documents, metadatas = self._get_collection_candidates(
+                    self.traffic_collection,
+                    where=where,
+                    max_rows=total_candidates,
+                )
+                kept = [
+                    index
+                    for index, metadata in enumerate(metadatas)
+                    if self._matches_filters(metadata, filters)
+                ]
+                ids = [ids[index] for index in kept]
+                documents = [documents[index] for index in kept]
+                metadatas = [metadatas[index] for index in kept]
+            evidence = self._lexical_rank(
+                question=question,
+                ids=ids,
+                documents=documents,
+                metadatas=metadatas,
+                source_kind="traffic",
+                top_k=requested_top_k,
+                allow_structured_zero_score=where is not None,
+            )
+            return RetrievalResult(
+                mode="traffic",
+                evidence=evidence,
+                where_filter={"prefilter_candidates": total_candidates},
+                backend=self.retrieval_backend,
+            )
+
         query_embedding = self._embed_query(question)
 
         # Bounding-box filtering is enforced through pandas prefilter before ranking.
@@ -403,12 +807,14 @@ class RAGRetriever:
                     mode="traffic",
                     evidence=filtered[:requested_top_k],
                     where_filter={"prefilter_candidates": "metadata-index-missing"},
+                    backend=self.retrieval_backend,
                 )
             if not candidate_ids:
                 return RetrievalResult(
                     mode="traffic",
                     evidence=[],
                     where_filter={"prefilter_candidates": 0},
+                    backend=self.retrieval_backend,
                 )
             evidence = self._rank_candidates_by_similarity(
                 query_embedding, candidate_ids, requested_top_k
@@ -418,6 +824,7 @@ class RAGRetriever:
                 mode="traffic",
                 evidence=evidence,
                 where_filter={"prefilter_candidates": len(candidate_ids)},
+                backend=self.retrieval_backend,
             )
 
         n_results = min(requested_top_k * 3, available)
@@ -442,15 +849,58 @@ class RAGRetriever:
             mode="traffic",
             evidence=filtered[:requested_top_k],
             where_filter=where,
+            backend=self.retrieval_backend,
         )
 
     def query_docs(self, question: str, top_k: Optional[int] = None) -> RetrievalResult:
+        requested_top_k = self._requested_top_k(top_k, self.top_k)
+        if requested_top_k == 0:
+            return RetrievalResult(
+                mode="docs",
+                evidence=[],
+                where_filter=None,
+                backend=self.retrieval_backend,
+            )
+        if self.openai is None:
+            if self._docs_lexical_cache is None:
+                self._docs_lexical_cache = self._get_collection_candidates(
+                    self.docs_collection,
+                    where=None,
+                    max_rows=self.local_scan_limit,
+                )
+            ids, documents, metadatas = self._docs_lexical_cache
+            if not ids:
+                return RetrievalResult(
+                    mode="docs",
+                    evidence=[],
+                    where_filter=None,
+                    backend=self.retrieval_backend,
+                )
+            evidence = self._lexical_rank(
+                question=question,
+                ids=ids,
+                documents=documents,
+                metadatas=metadatas,
+                source_kind="docs",
+                top_k=requested_top_k,
+            )
+            return RetrievalResult(
+                mode="docs",
+                evidence=evidence,
+                where_filter=None,
+                backend=self.retrieval_backend,
+            )
+
         available = self.docs_collection.count()
         if available == 0:
-            return RetrievalResult(mode="docs", evidence=[], where_filter=None)
-
+            return RetrievalResult(
+                mode="docs",
+                evidence=[],
+                where_filter=None,
+                backend=self.retrieval_backend,
+            )
         query_embedding = self._embed_query(question)
-        n_results = min(int(top_k or self.top_k), available)
+        n_results = min(requested_top_k, available)
         result = self.docs_collection.query(
             query_embeddings=[query_embedding],
             n_results=n_results,
@@ -460,8 +910,9 @@ class RAGRetriever:
         hits.sort(key=lambda x: x.distance if x.distance is not None else 10.0)
         return RetrievalResult(
             mode="docs",
-            evidence=hits[: int(top_k or self.top_k)],
+            evidence=hits[:requested_top_k],
             where_filter=None,
+            backend=self.retrieval_backend,
         )
 
     def _to_evidence(self, result: Dict[str, Any], source_kind: str) -> List[EvidenceItem]:
@@ -565,10 +1016,70 @@ class RAGRetriever:
         if df is None or df.empty:
             df = self._metadata_df_from_collection(filters=filters, max_rows=50000)
         if df.empty:
-            return {"analysis_type": "jump_detection", "count": 0, "rows": [], "events": []}
+            return {
+                "analysis_type": "jump_detection",
+                "count": 0,
+                "rows": [],
+                "events": [],
+                "scope_status": "unsupported" if filters.locode else "not_requested",
+                "scope_applied": False,
+                "reason": (
+                    "No AIS position rows with an observed port/LOCODE field were available; destination values were not used as a location proxy."
+                    if filters.locode
+                    else "No AIS position rows were available."
+                ),
+            }
 
         f = filters.normalized()
         work = df.copy()
+        if "event_kind" in work.columns:
+            work = work[work["event_kind"].fillna("").astype(str) == "ais_position"]
+
+        scope_metadata: Dict[str, Any] = {
+            "scope_status": "not_requested",
+            "scope_applied": False,
+            "scope_field": None,
+            "requested_locode": f.locode,
+        }
+        if f.locode:
+            scope_field = None
+            for field in ("locode_norm", "locode", "port_key"):
+                if field not in work.columns:
+                    continue
+                normalized = (
+                    work[field]
+                    .fillna("")
+                    .astype(str)
+                    .str.upper()
+                    .str.replace(r"[^A-Z0-9]", "", regex=True)
+                    .replace({"NA": "", "NAN": "", "NONE": "", "NULL": "", "UNK": "", "UNKNOWN": ""})
+                )
+                if not normalized.ne("").any():
+                    continue
+                work = work[normalized == f.locode].copy()
+                scope_field = field
+                break
+            if scope_field is None:
+                return {
+                    "analysis_type": "jump_detection",
+                    "count": 0,
+                    "rows": [],
+                    "events": [],
+                    "scope_status": "unsupported",
+                    "scope_applied": False,
+                    "requested_locode": f.locode,
+                    "reason": (
+                        f"AIS position rows do not contain a populated observed port/LOCODE field for {f.locode}. "
+                        "Destination values were not used as a location proxy."
+                    ),
+                }
+            scope_metadata.update(
+                {
+                    "scope_status": "applied",
+                    "scope_applied": True,
+                    "scope_field": scope_field,
+                }
+            )
         if "mmsi" in work.columns:
             work["mmsi"] = work["mmsi"].astype(str).map(normalize_identifier)
         if f.mmsi and "mmsi" in work.columns:
@@ -595,7 +1106,13 @@ class RAGRetriever:
             work["mmsi"] = None
         work = work.dropna(subset=["timestamp_dt", "latitude", "longitude", "mmsi"])
         if work.empty:
-            return {"analysis_type": "jump_detection", "count": 0, "rows": [], "events": []}
+            return {
+                "analysis_type": "jump_detection",
+                "count": 0,
+                "rows": [],
+                "events": [],
+                **scope_metadata,
+            }
 
         work = work.sort_values(["mmsi", "timestamp_dt"])
         jump_ids: List[str] = []
@@ -666,4 +1183,5 @@ class RAGRetriever:
             "count": len(jump_ids),
             "rows": jump_ids[:200],
             "events": jump_events[:200],
+            **scope_metadata,
         }

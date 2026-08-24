@@ -9,7 +9,18 @@ index:
   rebuild: false
 
 retrieval:
-  top_k: 8
+  # API callers may explicitly pass 0 to disable retrieval. Product surfaces
+  # should default to a small non-zero value so lineage is available.
+  top_k: 5
+  recommended_top_k: 5
+  provider: auto
+  local_lexical_scan_limit: 10000
+  preload_local_metadata: true
+  local_synthesis_provider: auto
+  ollama_base_url: http://127.0.0.1:11434
+  ollama_model: qwen2.5:7b-instruct
+  ollama_timeout_seconds: 30
+  ollama_max_output_tokens: 600
   strict_mode: true
   strict_distance_threshold: 0.42
   bbox_candidate_limit: 20000
@@ -49,12 +60,19 @@ predict:
 
 kpi:
   occupancy_max_expanded_rows: 3500000
-  congestion_formula: ratio_sum
+  congestion_formula: pressure_v2
+  pressure_arrivals_weight: 0.60
+  pressure_dwell_weight: 0.40
+  pressure_ratio_clip: [0.0, 5.0]
+  voyage_max_gap_days: 30
 
 forecast:
   default_horizon_weeks: 4
   min_history_days: 60
   backtest_days: 28
+  maximum_horizon_weeks: 8
+  mase_max_exclusive: 1.0
+  interval_80_coverage_range: [0.70, 0.90]
 
 carbon:
   factor_registry_path: config/carbon_factors.v1.json

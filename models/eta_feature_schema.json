@@ -32,8 +32,8 @@
   ],
   "target": "eta_minutes_label",
   "model_kind": "histgb",
-  "train_rows": 120000,
-  "test_rows": 30000,
+  "train_rows": 37427,
+  "test_rows": 9357,
   "max_train_rows": 120000,
   "max_test_rows": 30000
 }
