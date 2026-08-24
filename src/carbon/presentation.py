@@ -388,7 +388,7 @@ def compute_emissions_metrics(
     if result_table is None or result_table.empty:
         return out
 
-    metric_col = "wtw_co2e_t" if boundary == "WTW" else "ttw_co2e_t"
+    metric_col = "wtw_co2e_t" if boundary in {"WTW", "TTW_WTW"} else "ttw_co2e_t"
     if metric_col not in result_table.columns:
         metric_col = "co2_t" if "co2_t" in result_table.columns else metric_col
     if metric_col not in result_table.columns:

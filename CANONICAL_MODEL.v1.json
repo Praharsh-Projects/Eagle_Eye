@@ -1,0 +1,36 @@
+{
+  "schema_version": "1.0.0",
+  "status": "frozen_canonical_runtime",
+  "canonicalized_at_utc": "2026-08-24T13:04:46Z",
+  "project": "Eagle Eye Maritime Intelligence",
+  "local_project_root": "/Users/praharshchintu/dev/EagleEye",
+  "runtime": {
+    "launcher": "./run_eagle_eye.sh",
+    "address": "127.0.0.1",
+    "port": 8000,
+    "start_url": "http://127.0.0.1:8000/overview",
+    "public_interface": "React/Vite operations workspace served by FastAPI",
+    "qa_fallback": "Streamlit on port 8501 only when explicitly requested"
+  },
+  "revision": {
+    "product_revision_id": "eagle_eye_computational_eval_v3",
+    "baseline_origin": "benchmark_recovery_v2",
+    "protected_manifest": "thesis/bth-v2/study/manifests/protected_application.sha256",
+    "protected_baseline_sha256": "fddefb2f00c11f76e0079c937e0a20b5c24a41f44a2fd7837036f50461fd3d49",
+    "protected_file_count": 156,
+    "verification_status": "pass"
+  },
+  "github": {
+    "repository": "https://github.com/Praharsh-Projects/Eagle_Eye",
+    "canonical_branch": "main",
+    "canonical_tag": "eagle-eye-computational-eval-v3",
+    "published_protected_manifest": "release/protected_application.sha256",
+    "published_source_manifest": "release/github_source_snapshot.sha256",
+    "publication_profile": "application source and safe runtime assets only; secrets, private or generated data, caches, build products, and thesis workspaces are excluded"
+  },
+  "boundaries": [
+    "This record selects an already validated product build; it does not create a new model or evaluation run.",
+    "R12 is the final evidence-admission revision and is not a twelfth model execution.",
+    "The protected application files remain byte-exact at canonicalization time."
+  ]
+}

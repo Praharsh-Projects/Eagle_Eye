@@ -35,6 +35,95 @@ def _write_minimal_carbon_artifacts(
 
 
 class CarbonQueryStateTests(unittest.TestCase):
+    def test_canonical_port_filter_does_not_include_route_like_keys(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            base = {
+                "mmsi": "111111111",
+                "call_id": None,
+                "port_label": "SEGOT",
+                "locode_norm": "",
+                "timestamp_start": pd.Timestamp("2022-03-05T10:00:00Z"),
+                "timestamp_end": pd.Timestamp("2022-03-05T11:00:00Z"),
+                "duration_h": 1.0,
+                "row_count": 1,
+                "fallback_usage_ratio": 0.0,
+                "ci_width_rel": 0.2,
+                "confidence_reason": "ok",
+                "co2_t": 1.0,
+                "ttw_co2e_t": 1.0,
+                "wtt_co2e_t": 0.2,
+                "wtw_co2e_t": 1.2,
+                "nox_kg": 1.0,
+                "sox_kg": 1.0,
+                "pm_kg": 1.0,
+                "co2_t_lower": 0.8,
+                "ttw_co2e_t_lower": 0.8,
+                "wtt_co2e_t_lower": 0.1,
+                "wtw_co2e_t_lower": 0.9,
+                "nox_kg_lower": 0.8,
+                "sox_kg_lower": 0.8,
+                "pm_kg_lower": 0.8,
+                "co2_t_upper": 1.2,
+                "ttw_co2e_t_upper": 1.2,
+                "wtt_co2e_t_upper": 0.3,
+                "wtw_co2e_t_upper": 1.5,
+                "nox_kg_upper": 1.2,
+                "sox_kg_upper": 1.2,
+                "pm_kg_upper": 1.2,
+            }
+            segments = pd.DataFrame(
+                [
+                    {**base, "segment_id": "seg-exact", "port_key": "SEGOT"},
+                    {
+                        **base,
+                        "segment_id": "seg-route",
+                        "port_key": "SEGOT SEKAN",
+                        "ttw_co2e_t": 100.0,
+                        "ttw_co2e_t_lower": 80.0,
+                        "ttw_co2e_t_upper": 120.0,
+                    },
+                ]
+            )
+            calls = pd.DataFrame(columns=["call_id", "mmsi", "ttw_co2e_t", "wtw_co2e_t"])
+            daily = pd.DataFrame(
+                [
+                    {
+                        "date": pd.Timestamp("2022-03-05T00:00:00Z"),
+                        "port_key": "SEGOT",
+                        "port_label": "SEGOT",
+                        "locode_norm": "",
+                        "ttw_co2e_t": 1.0,
+                        "ttw_co2e_t_lower": 0.8,
+                        "ttw_co2e_t_upper": 1.2,
+                        "wtw_co2e_t": 1.2,
+                    },
+                    {
+                        "date": pd.Timestamp("2022-03-05T00:00:00Z"),
+                        "port_key": "SEGOT SEKAN",
+                        "port_label": "SEGOT SEKAN",
+                        "locode_norm": "",
+                        "ttw_co2e_t": 100.0,
+                        "ttw_co2e_t_lower": 80.0,
+                        "ttw_co2e_t_upper": 120.0,
+                        "wtw_co2e_t": 120.0,
+                    },
+                ]
+            )
+            evidence = pd.DataFrame(columns=["evidence_id", "segment_id", "mmsi", "call_id", "port_key"])
+            _write_minimal_carbon_artifacts(root, segments, calls, daily, evidence)
+            engine = CarbonQueryEngine(processed_dir=root, auto_build=False)
+            result = engine.query_port_emissions(
+                port_id="SEGOT",
+                date_from="2022-03-01",
+                date_to="2022-03-31",
+                boundary="TTW",
+                pollutants=["CO2e"],
+            )
+            self.assertEqual(result.status, "ok")
+            self.assertAlmostEqual(result.uncertainty_interval["CO2e"]["point"], 1.0)
+            self.assertNotIn("101.00", result.answer)
+
     def test_port_query_uses_daily_proxy_when_no_call_linked_segments(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
@@ -345,6 +434,25 @@ class CarbonQueryStateTests(unittest.TestCase):
             )
             self.assertEqual(result.status, "no_data")
             self.assertEqual(result.result_state, CARBON_STATE_FORECAST_ONLY)
+
+            result_with_resolved_date = engine.from_question_entities(
+                question="Predict carbon emissions at SEGOT next Friday",
+                entities={
+                    "boundary": "WTW",
+                    "pollutants": ["CO2e"],
+                    "port": "SEGOT",
+                    "date_from": "2026-07-24",
+                    "date_to": "2026-07-24",
+                },
+                user_filters={},
+                resolved_scope={
+                    "port": "SEGOT",
+                    "date_from": "2026-07-24",
+                    "date_to": "2026-07-24",
+                },
+            )
+            self.assertEqual(result_with_resolved_date.status, "no_data")
+            self.assertEqual(result_with_resolved_date.result_state, CARBON_STATE_FORECAST_ONLY)
 
     def test_estimate_query_routes_to_assumption_engine(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

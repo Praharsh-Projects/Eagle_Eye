@@ -1,0 +1,468 @@
+{
+  "schema_version": "4.0",
+  "authorship": "Human-authored expectations. Never regenerate expected values from the planner or classifier under test.",
+  "cases": [
+    {
+      "id": "help_greeting",
+      "prompt": "Hello, what can you do?",
+      "paraphrases": ["What questions does Eagle Eye support?"],
+      "expected": {"mode": "app_help", "operation": "help", "visualization": {"kind": "omitted"}}
+    },
+    {
+      "id": "help_app_explanation",
+      "prompt": "Will you explain this app?",
+      "paraphrases": ["How do I use Eagle Eye?"],
+      "expected": {"mode": "app_help", "operation": "help", "visualization": {"kind": "omitted"}}
+    },
+    {
+      "id": "research_solas",
+      "prompt": "What does SOLAS Chapter V require?",
+      "paraphrases": ["Explain the SOLAS Chapter V navigation rules."],
+      "expected": {"mode": "maritime_research", "operation": "research", "visualization": {"kind": "omitted"}}
+    },
+    {
+      "id": "general_email",
+      "prompt": "Write a short email thanking a colleague.",
+      "paraphrases": ["Draft a brief thank-you note to my teammate."],
+      "expected": {"mode": "general_chat", "operation": "general_response", "visualization": {"kind": "omitted"}}
+    },
+    {
+      "id": "general_science",
+      "prompt": "Why is the sky blue?",
+      "paraphrases": ["Explain why ocean water looks blue."],
+      "expected": {"mode": "general_chat", "operation": "general_response", "visualization": {"kind": "omitted"}}
+    },
+    {
+      "id": "general_current_weather",
+      "prompt": "What is the weather at Gothenburg today?",
+      "paraphrases": ["Tell me the current weather in Gothenburg."],
+      "expected": {"mode": "general_chat", "operation": "general_response", "visualization": {"kind": "omitted"}}
+    },
+    {
+      "id": "arrivals_month_of_phrase",
+      "prompt": "How many ship calls did Gothenburg receive during March of 2022?",
+      "paraphrases": ["How many arrivals did SEGOT have in March 2022?"],
+      "expected": {
+        "mode": "analytics",
+        "operation": "arrivals",
+        "ports": ["SEGOT"],
+        "date_from": "2022-03-01",
+        "date_to": "2022-03-31",
+        "required_facts": {"arrival_count": 488},
+        "visualization": {"kind": "kpi"}
+      }
+    },
+    {
+      "id": "arrivals_daily_plot",
+      "prompt": "Plot daily arrivals at Gothenburg for March 2022.",
+      "paraphrases": ["Graph SEGOT arrivals by day for March 2022."],
+      "expected": {
+        "mode": "analytics",
+        "operation": "arrivals",
+        "ports": ["SEGOT"],
+        "date_from": "2022-03-01",
+        "date_to": "2022-03-31",
+        "required_facts": {"arrival_count": 488, "day_buckets": 31},
+        "visualization": {"kind": "cartesian", "chart_type": "line"}
+      }
+    },
+    {
+      "id": "weekday_comparison",
+      "prompt": "Is Monday busier than Friday at Gothenburg in March 2022?",
+      "paraphrases": ["Compare Monday and Friday arrivals at SEGOT during March 2022."],
+      "expected": {
+        "mode": "analytics",
+        "operation": "weekday_comparison",
+        "ports": ["SEGOT"],
+        "date_from": "2022-03-01",
+        "date_to": "2022-03-31",
+        "required_facts": {"Monday": 56, "Friday": 59, "winner": "Friday"},
+        "visualization": {"kind": "cartesian", "chart_type": "grouped_bar"}
+      }
+    },
+    {
+      "id": "port_comparison",
+      "prompt": "Which port had the most arrivals, Gothenburg or Karlshamn, in March 2022?",
+      "paraphrases": ["Compare March 2022 arrival totals for SEGOT and SEKAN."],
+      "expected": {
+        "mode": "analytics",
+        "operation": "port_comparison",
+        "ports": ["SEGOT", "SEKAN"],
+        "date_from": "2022-03-01",
+        "date_to": "2022-03-31",
+        "required_facts": {"SEGOT": 488, "SEKAN": 72, "winner": "SEGOT"},
+        "visualization": {"kind": "cartesian", "chart_type": "bar"}
+      }
+    },
+    {
+      "id": "karlskrona_canonical_locode",
+      "prompt": "How many vessel arrivals were recorded at Karlshamn and Karlskrona in March 2022?",
+      "paraphrases": [
+        "Show March 2022 vessel arrivals for Karlshamn and Karlskrona.",
+        "How many arrivals did SEKAN and SEKAA receive in March 2022?",
+        "List arrival counts for Karlshamn and Karlskrona during March 2022."
+      ],
+      "expected": {
+        "mode": "analytics",
+        "operation": "arrivals_multi",
+        "ports": ["SEKAN", "SEKAA"],
+        "date_from": "2022-03-01",
+        "date_to": "2022-03-31",
+        "result_state": "COMPUTED",
+        "required_facts": {"SEKAN": 72, "SEKAA": 5},
+        "answer_terms": ["77 vessel arrivals", "SEKAN", "SEKAA"],
+        "visualization": {"kind": "cartesian", "chart_type": "bar"}
+      }
+    },
+    {
+      "id": "vessel_type_composition",
+      "prompt": "Show the share of arrivals by vessel type at Gothenburg in March 2022.",
+      "paraphrases": ["Break down SEGOT March 2022 arrivals by vessel type."],
+      "expected": {
+        "mode": "analytics",
+        "operation": "vessel_type_composition",
+        "ports": ["SEGOT"],
+        "date_from": "2022-03-01",
+        "date_to": "2022-03-31",
+        "required_facts": {"cargo ship": 253, "tanker": 235},
+        "visualization": {"kind": "cartesian", "chart_type": "stacked_bar"}
+      }
+    },
+    {
+      "id": "dwell_distribution",
+      "prompt": "Show the distribution of vessel dwell times at Gothenburg in March 2022.",
+      "paraphrases": ["Plot a histogram of SEGOT dwell times in March 2022."],
+      "expected": {
+        "mode": "analytics",
+        "operation": "dwell_distribution",
+        "ports": ["SEGOT"],
+        "date_from": "2022-03-01",
+        "date_to": "2022-03-31",
+        "visualization": {"kind": "distribution", "chart_type": "histogram"}
+      }
+    },
+    {
+      "id": "mmsi_port_stay_duration",
+      "prompt": "For MMSI 245286000, how long was the vessel in port on 2021-01-01?",
+      "paraphrases": [
+        "How much time did MMSI 245286000 spend in port on January 1, 2021?",
+        "What was the port-stay duration for MMSI 245286000 on 1 January 2021?",
+        "On 2021-01-01, how long did MMSI 245286000 remain at the port?",
+        "Tell me the time in port for MMSI 245286000 on 2021-01-01."
+      ],
+      "expected": {
+        "mode": "analytics",
+        "operation": "mmsi_port_stays",
+        "mmsi": "245286000",
+        "date_from": "2021-01-01",
+        "date_to": "2021-01-01",
+        "result_state": "COMPUTED",
+        "required_facts": {"dwell_minutes": 933.3, "LVVNT": 933.3},
+        "visualization": {"kind": "kpi"}
+      }
+    },
+    {
+      "id": "first_arrival",
+      "prompt": "What was the first arrival at Karlshamn in March 2022?",
+      "paraphrases": ["Give me the first Karlshamn vessel arrival in March 2022."],
+      "expected": {
+        "mode": "analytics",
+        "operation": "first_arrival",
+        "ports": ["SEKAN"],
+        "date_from": "2022-03-01",
+        "date_to": "2022-03-31",
+        "visualization": {"kind": "timeline"}
+      }
+    },
+    {
+      "id": "last_arrival",
+      "prompt": "What was the last arrival at Gothenburg in March 2022?",
+      "paraphrases": ["Show the last vessel arrival at SEGOT in March 2022."],
+      "expected": {
+        "mode": "analytics",
+        "operation": "last_arrival",
+        "ports": ["SEGOT"],
+        "date_from": "2022-03-01",
+        "date_to": "2022-03-31",
+        "visualization": {"kind": "timeline"}
+      }
+    },
+    {
+      "id": "first_departure",
+      "prompt": "What was the first departure from Gothenburg in March 2022?",
+      "paraphrases": ["Which vessel departed SEGOT first in March 2022?"],
+      "expected": {
+        "mode": "analytics",
+        "operation": "first_departure",
+        "ports": ["SEGOT"],
+        "date_from": "2022-03-01",
+        "date_to": "2022-03-31",
+        "visualization": {"kind": "timeline"}
+      }
+    },
+    {
+      "id": "route_duration",
+      "prompt": "What is median and p90 route travel time from PLSZZ to PLSWI in 2021-02?",
+      "paraphrases": ["Summarize PLSZZ to PLSWI voyage duration percentiles for February 2021."],
+      "expected": {
+        "mode": "analytics",
+        "operation": "route_travel_time",
+        "ports": ["PLSZZ", "PLSWI"],
+        "date_from": "2021-02-01",
+        "date_to": "2021-02-28",
+        "result_state": "COMPUTED",
+        "answer_terms": ["2.76", "4.35", "56 voyage"],
+        "visualization": {"kind": "distribution", "chart_type": "percentile"}
+      }
+    },
+    {
+      "id": "stale_current_arrivals",
+      "prompt": "How many arrivals are there at Gothenburg today?",
+      "paraphrases": ["Give me live arrivals for SEGOT."],
+      "expected": {
+        "mode": "analytics",
+        "operation": "current_arrivals",
+        "ports": ["SEGOT"],
+        "result_state": "NO_CURRENT_DATA",
+        "visualization": {"kind": "omitted", "reason": "stale_data"}
+      }
+    },
+    {
+      "id": "stale_current_pressure",
+      "prompt": "What is port pressure now at Gothenburg?",
+      "paraphrases": ["Show current congestion at SEGOT."],
+      "expected": {
+        "mode": "analytics",
+        "operation": "congestion",
+        "ports": ["SEGOT"],
+        "result_state": "NO_CURRENT_DATA",
+        "visualization": {"kind": "omitted", "reason": "stale_data"}
+      }
+    },
+    {
+      "id": "pressure_against_baseline",
+      "prompt": "Is pressure at SEGVX above baseline on 2022-03-10?",
+      "paraphrases": [
+        "Was SEGVX port pressure above its historical baseline on March 10, 2022?",
+        "Compare SEGVX pressure with baseline for 10 March 2022.",
+        "On 2022-03-10, did SEGVX pressure exceed 1.00?",
+        "What was SEGVX pressure relative to its baseline on 2022-03-10?"
+      ],
+      "expected": {
+        "mode": "analytics",
+        "operation": "congestion",
+        "ports": ["SEGVX"],
+        "date_from": "2022-03-10",
+        "date_to": "2022-03-10",
+        "result_state": "COMPUTED",
+        "required_facts": {"congestion_index": 0.9876904704490911},
+        "answer_terms": ["0.99", "below", "1.00 historical baseline"],
+        "visualization": {"kind": "kpi"}
+      }
+    },
+    {
+      "id": "pressure_by_vessel_type",
+      "prompt": "Show pressure by vessel type at GDANSK for 2022-03.",
+      "paraphrases": [
+        "Break down March 2022 port pressure at Gdansk by vessel type.",
+        "Compare the arrivals-pressure proxy by vessel category at PLGDN during March 2022.",
+        "Which vessel type had the highest pressure at PLGDN in March 2022?",
+        "Show the March 2022 pressure index for each ship category at GDANSK."
+      ],
+      "expected": {
+        "mode": "analytics",
+        "operation": "pressure_by_vessel_type",
+        "ports": ["PLGDN"],
+        "date_from": "2022-03-01",
+        "date_to": "2022-03-31",
+        "result_state": "COMPUTED",
+        "answer_terms": ["cargo ship", "1.23", "historical daily baseline"],
+        "visualization": {"kind": "cartesian", "chart_type": "bar"}
+      }
+    },
+    {
+      "id": "forecast_keyword_false_positive",
+      "prompt": "What arrivals should I expect at SEGOT in March 2022?",
+      "paraphrases": ["How many arrivals were expected at SEGOT during March 2022?"],
+      "expected": {
+        "mode": "analytics",
+        "operation": "arrivals",
+        "ports": ["SEGOT"],
+        "date_from": "2022-03-01",
+        "date_to": "2022-03-31",
+        "required_facts": {"arrivals_vessels": 473},
+        "visualization": {"kind": "kpi"}
+      }
+    },
+    {
+      "id": "arrival_forecast_validated_horizon",
+      "prompt": "Forecast arrivals at Gothenburg for 2022-05-15.",
+      "paraphrases": ["Predict SEGOT arrivals on 15 May 2022."],
+      "expected": {
+        "mode": "analytics",
+        "operation": "forecast_arrivals",
+        "ports": ["SEGOT"],
+        "date_from": "2022-05-15",
+        "date_to": "2022-05-15",
+        "result_state": "COMPUTED",
+        "visualization": {"kind": "forecast"}
+      }
+    },
+    {
+      "id": "relative_current_forecast_is_stale",
+      "prompt": "Forecast congestion at Gothenburg next week.",
+      "paraphrases": ["Give me Gothenburg's congestion forecast for the coming week."],
+      "expected": {
+        "mode": "analytics",
+        "operation": "forecast_congestion",
+        "ports": ["SEGOT"],
+        "result_state": "NO_CURRENT_DATA",
+        "visualization": {"kind": "omitted", "reason": "stale_data"}
+      }
+    },
+    {
+      "id": "arrival_forecast_over_maximum_horizon",
+      "prompt": "Predict arrivals at Gothenburg in 10 weeks.",
+      "paraphrases": ["Forecast SEGOT arrivals 10 weeks ahead."],
+      "expected": {
+        "mode": "analytics",
+        "operation": "forecast_arrivals",
+        "ports": ["SEGOT"],
+        "result_state": "NO_DATA",
+        "visualization": {"kind": "omitted", "reason": "insufficient_data"}
+      }
+    },
+    {
+      "id": "arrival_forecast_failing_validation_gate",
+      "prompt": "Forecast arrivals at SEHEL for 2022-05-15.",
+      "paraphrases": ["Predict SEHEL vessel arrivals on 15 May 2022."],
+      "expected": {
+        "mode": "analytics",
+        "operation": "forecast_arrivals",
+        "ports": ["SEHEL"],
+        "date_from": "2022-05-15",
+        "date_to": "2022-05-15",
+        "result_state": "COMPUTED",
+        "answer_terms": ["4.14 arrivals", "80% interval", "0.00", "15.50"],
+        "visualization": {"kind": "forecast"}
+      }
+    },
+    {
+      "id": "weekday_hour_heatmap",
+      "prompt": "Show a weekday by hour arrivals heatmap for Gothenburg in March 2022.",
+      "paraphrases": ["Create a heatmap of SEGOT arrivals by weekday and hour for March 2022."],
+      "expected": {
+        "mode": "analytics",
+        "operation": "arrival_pattern",
+        "ports": ["SEGOT"],
+        "date_from": "2022-03-01",
+        "date_to": "2022-03-31",
+        "result_state": "COMPUTED",
+        "visualization": {"kind": "heatmap"}
+      }
+    },
+    {
+      "id": "arrivals_dwell_correlation",
+      "prompt": "Show the correlation between daily arrivals and dwell time at Gothenburg in March 2022.",
+      "paraphrases": ["Plot the relationship between SEGOT arrivals and median dwell during March 2022."],
+      "expected": {
+        "mode": "analytics",
+        "operation": "correlation",
+        "ports": ["SEGOT"],
+        "date_from": "2022-03-01",
+        "date_to": "2022-03-31",
+        "result_state": "COMPUTED",
+        "visualization": {"kind": "cartesian", "chart_type": "scatter"}
+      }
+    },
+    {
+      "id": "explicit_area_trend",
+      "prompt": "Show an area chart of daily arrivals at Gothenburg in March 2022.",
+      "paraphrases": ["Use an area graph for SEGOT daily arrivals in March 2022."],
+      "expected": {
+        "mode": "analytics",
+        "operation": "arrivals",
+        "ports": ["SEGOT"],
+        "date_from": "2022-03-01",
+        "date_to": "2022-03-31",
+        "required_facts": {"arrivals_vessels": 473, "day_buckets": 31},
+        "visualization": {"kind": "cartesian", "chart_type": "area"}
+      }
+    },
+    {
+      "id": "explicit_bar_trend",
+      "prompt": "Show a bar chart of daily arrivals at Gothenburg in March 2022.",
+      "paraphrases": ["Use bars to chart SEGOT arrivals by day in March 2022."],
+      "expected": {
+        "mode": "analytics",
+        "operation": "arrivals",
+        "ports": ["SEGOT"],
+        "date_from": "2022-03-01",
+        "date_to": "2022-03-31",
+        "required_facts": {"arrivals_vessels": 473, "day_buckets": 31},
+        "visualization": {"kind": "cartesian", "chart_type": "bar"}
+      }
+    },
+    {
+      "id": "unsuitable_requested_map",
+      "prompt": "Show vessel dwell times on a map at Gothenburg in March 2022.",
+      "paraphrases": ["Put SEGOT dwell times for March 2022 on a map."],
+      "expected": {
+        "mode": "analytics",
+        "operation": "dwell_summary",
+        "ports": ["SEGOT"],
+        "date_from": "2022-03-01",
+        "date_to": "2022-03-31",
+        "result_state": "COMPUTED",
+        "visualization": {"kind": "omitted", "reason": "unsupported_visual"}
+      }
+    },
+    {
+      "id": "ais_jump_map",
+      "prompt": "Show suspicious AIS jumps for MMSI 212575000 on 2021-01-01.",
+      "paraphrases": ["Map coordinate-jump anomalies for MMSI 212575000 on 1 January 2021."],
+      "expected": {
+        "mode": "analytics",
+        "operation": "ais_jump",
+        "mmsi": "212575000",
+        "date_from": "2021-01-01",
+        "date_to": "2021-01-01",
+        "visualization": {"kind": "omitted", "reason": "insufficient_data"}
+      }
+    },
+    {
+      "id": "unsupported_crane",
+      "prompt": "What is crane utilization at berth 3 in SEGOT today?",
+      "paraphrases": ["How busy is berth 3's crane at SEGOT right now?"],
+      "expected": {"mode": "unsupported", "operation": "unsupported", "result_state": "UNSUPPORTED", "visualization": {"kind": "omitted"}}
+    }
+  ],
+  "conversation_cases": [
+    {
+      "id": "follow_up_port_inherits_scope",
+      "turns": [
+        {
+          "prompt": "How many arrivals were recorded at Gothenburg in March 2022?",
+          "expected": {"mode": "analytics", "operation": "arrivals", "ports": ["SEGOT"], "date_from": "2022-03-01", "date_to": "2022-03-31"}
+        },
+        {
+          "prompt": "What about Karlshamn?",
+          "expected": {"mode": "analytics", "operation": "arrivals", "ports": ["SEKAN"], "date_from": "2022-03-01", "date_to": "2022-03-31"}
+        }
+      ]
+    },
+    {
+      "id": "follow_up_explain_previous",
+      "turns": [
+        {
+          "prompt": "How many arrivals were recorded at Gothenburg in March 2022?",
+          "expected": {"mode": "analytics", "operation": "arrivals", "ports": ["SEGOT"]}
+        },
+        {
+          "prompt": "Explain that result in simpler terms.",
+          "expected": {"mode": "analytics", "operation": "explain_previous", "ports": ["SEGOT"]}
+        }
+      ]
+    }
+  ]
+}

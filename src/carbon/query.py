@@ -13,6 +13,7 @@ import pandas as pd
 
 from src.carbon.build import build_carbon_layer
 from src.carbon.factors import load_factor_registry
+from src.utils.parquet_io import read_parquet_safely
 
 
 SUPPORTED_POLLUTANTS = ["CO2", "CO2e", "NOx", "SOx", "PM"]
@@ -57,6 +58,22 @@ def _metric_column(pollutant: str, boundary: str) -> str:
     if pollutant == "PM":
         return "pm_kg"
     raise ValueError(f"Unsupported pollutant: {pollutant}")
+
+
+def _pollutant_unit(pollutant: str) -> str:
+    if pollutant == "CO2e":
+        return "tCO2e"
+    if pollutant == "CO2":
+        return "tCO2"
+    return "kg"
+
+
+def _metric_unit(metric: str) -> str:
+    if metric in {"ttw_co2e_t", "wtw_co2e_t", "wtt_co2e_t"}:
+        return "tCO2e"
+    if metric == "co2_t":
+        return "tCO2"
+    return "kg"
 
 
 _MODE_ALIASES: Dict[str, str] = {
@@ -144,6 +161,7 @@ def _port_filter(df: pd.DataFrame, port_token: Optional[str]) -> pd.DataFrame:
     token = str(port_token).strip()
     code = re.sub(r"[^A-Z0-9]", "", token.upper())
     low = token.lower()
+    canonical_code = bool(re.fullmatch(r"[A-Z]{5}", code))
     mask = pd.Series(False, index=df.index)
     if "port_key" in df.columns:
         port_key = df["port_key"].fillna("").astype(str)
@@ -151,9 +169,7 @@ def _port_filter(df: pd.DataFrame, port_token: Optional[str]) -> pd.DataFrame:
         port_key_norm = port_key_upper.str.replace(r"[^A-Z0-9]", "", regex=True)
         mask |= port_key_upper == code
         mask |= port_key_norm == code
-        if code:
-            mask |= port_key_norm.str.contains(code, regex=False)
-        if low:
+        if low and not canonical_code:
             mask |= port_key.str.lower().str.contains(low, regex=False)
     if "locode_norm" in df.columns:
         locode = df["locode_norm"].fillna("").astype(str).str.upper().str.replace(r"[^A-Z0-9]", "", regex=True)
@@ -161,10 +177,10 @@ def _port_filter(df: pd.DataFrame, port_token: Optional[str]) -> pd.DataFrame:
     if "port_label" in df.columns:
         port_label = df["port_label"].fillna("").astype(str)
         port_label_norm = port_label.str.upper().str.replace(r"[^A-Z0-9]", "", regex=True)
-        if low:
+        if low and not canonical_code:
             mask |= port_label.str.lower().str.contains(low, regex=False)
         if code:
-            mask |= port_label_norm.str.contains(code, regex=False)
+            mask |= port_label_norm == code
     return df[mask]
 
 
@@ -235,7 +251,7 @@ class CarbonQueryEngine:
         factor_registry_path: str | Path = "config/carbon_factors.v1.json",
         monte_carlo_draws: int = 500,
         sanity_config: Optional[Dict[str, Any]] = None,
-        auto_build: bool = True,
+        auto_build: bool = False,
     ) -> None:
         self.processed_dir = Path(processed_dir)
         self.factor_registry_path = Path(factor_registry_path)
@@ -259,11 +275,6 @@ class CarbonQueryEngine:
                         pass
         self.export_dir = self.processed_dir / "carbon_exports"
         self._runtime_export_fallback_dir = Path("/tmp/eagle_eye_carbon_exports")
-        try:
-            self.export_dir.mkdir(parents=True, exist_ok=True)
-        except OSError:
-            # Read-only runtimes (e.g., docker volume mounted :ro) should not fail query execution.
-            pass
         if auto_build:
             self.ensure_built()
 
@@ -308,7 +319,7 @@ class CarbonQueryEngine:
         if self._daily_port is None:
             path = self.processed_dir / "carbon_emissions_daily_port.parquet"
             if path.exists():
-                df = pd.read_parquet(path)
+                df = read_parquet_safely(path)
                 if "date" in df.columns:
                     df["date"] = pd.to_datetime(df["date"], errors="coerce", utc=True).dt.floor("D")
                 self._daily_port = df
@@ -320,22 +331,31 @@ class CarbonQueryEngine:
     def calls(self) -> pd.DataFrame:
         if self._calls is None:
             path = self.processed_dir / "carbon_emissions_call.parquet"
-            self._calls = pd.read_parquet(path) if path.exists() else pd.DataFrame()
+            self._calls = read_parquet_safely(path) if path.exists() else pd.DataFrame()
         return self._calls
 
     @property
     def segments(self) -> pd.DataFrame:
         if self._segments is None:
             path = self.processed_dir / "carbon_emissions_segment.parquet"
-            self._segments = pd.read_parquet(path) if path.exists() else pd.DataFrame()
+            self._segments = read_parquet_safely(path) if path.exists() else pd.DataFrame()
         return self._segments
 
     @property
     def evidence(self) -> pd.DataFrame:
         if self._evidence is None:
             path = self.processed_dir / "carbon_evidence.parquet"
-            self._evidence = pd.read_parquet(path) if path.exists() else pd.DataFrame()
+            self._evidence = read_parquet_safely(path) if path.exists() else pd.DataFrame()
         return self._evidence
+
+    def preload(self) -> "CarbonQueryEngine":
+        """Materialize carbon tables before sharing this engine across UI threads."""
+        _ = self.daily_port
+        _ = self.calls
+        _ = self.segments
+        _ = self.evidence
+        _ = self.params_version
+        return self
 
     def _no_data(
         self,
@@ -391,6 +411,52 @@ class CarbonQueryEngine:
             upper = float(_numeric_series(df, upper_col).sum())
             summary[pol] = {"point": point, "lower": lower, "upper": upper}
         return summary
+
+    @staticmethod
+    def _format_pollutant_totals(
+        uncertainty: Dict[str, Dict[str, float]],
+        pollutants: Sequence[str],
+    ) -> str:
+        parts: List[str] = []
+        for pollutant in pollutants:
+            values = uncertainty.get(pollutant, {})
+            if "point" not in values:
+                continue
+            parts.append(
+                f"{pollutant}={float(values['point']):.2f} {_pollutant_unit(pollutant)}"
+            )
+        return ", ".join(parts)
+
+    @staticmethod
+    def _series_summary(table: pd.DataFrame, metric: str, group_by: str) -> str:
+        if table.empty or metric not in table.columns or "date" not in table.columns:
+            return ""
+        values = pd.to_numeric(table[metric], errors="coerce")
+        if values.dropna().empty:
+            return ""
+        peak_index = values.idxmax()
+        peak_bucket = table.loc[peak_index, "date"]
+        if isinstance(peak_bucket, pd.Timestamp):
+            peak_bucket = peak_bucket.strftime("%Y-%m-%d")
+        period_label = "monthly" if group_by.lower() in {"month", "monthly"} else "daily"
+        preposition = "in" if period_label == "monthly" else "on"
+        return (
+            f"The series contains {len(table)} {period_label} periods; the peak was "
+            f"{float(values.loc[peak_index]):.2f} {_metric_unit(metric)} {preposition} {peak_bucket}."
+        )
+
+    @staticmethod
+    def _append_evidence_context(result: CarbonResult, question: str) -> CarbonResult:
+        if "evidence id" not in question.lower():
+            return result
+        if result.evidence_ids:
+            displayed = ", ".join(result.evidence_ids[:5])
+            remainder = len(result.evidence_ids) - min(5, len(result.evidence_ids))
+            suffix = f" and {remainder} more" if remainder else ""
+            result.answer = f"{result.answer} Evidence IDs: {displayed}{suffix}."
+        elif result.status == "ok":
+            result.answer = f"{result.answer} No carbon evidence IDs were available for this computed scope."
+        return result
 
     def _filtered_segments_scope(
         self,
@@ -508,7 +574,7 @@ class CarbonQueryEngine:
             return pd.DataFrame(), None
 
         if group_by.lower() in {"month", "monthly"}:
-            work["bucket"] = work["date"].dt.to_period("M").astype(str)
+            work["bucket"] = work["date"].dt.tz_localize(None).dt.to_period("M").astype(str)
             group_cols = ["bucket", "port_key", "port_label", "locode_norm"]
         else:
             work["bucket"] = work["date"]
@@ -630,7 +696,8 @@ class CarbonQueryEngine:
         }
 
     def _write_exports(self, prefix: str, table: pd.DataFrame, payload: Dict[str, Any]) -> tuple[Optional[str], Optional[str]]:
-        stamp = pd.Timestamp.utcnow().strftime("%Y%m%dT%H%M%SZ")
+        prefix = re.sub(r"[^A-Za-z0-9_-]+", "_", str(prefix)).strip("_") or "carbon_result"
+        stamp = pd.Timestamp.now(tz="UTC").strftime("%Y%m%dT%H%M%SZ")
         candidate_dirs = [self.export_dir, self._runtime_export_fallback_dir]
 
         def _json_default(value: Any) -> Any:
@@ -653,6 +720,40 @@ class CarbonQueryEngine:
             except OSError:
                 continue
         return None, None
+
+    def export_result(
+        self,
+        result: CarbonResult,
+        *,
+        prefix: str = "carbon_result",
+    ) -> tuple[Optional[str], Optional[str]]:
+        """Explicitly persist a previously computed result.
+
+        Query methods never call this helper.  Keeping export as a separate
+        action prevents ordinary chat/API reads from mutating the filesystem.
+        """
+        if result.table is None:
+            return None, None
+        payload = {
+            "boundary": result.boundary,
+            "pollutants": list(result.pollutants),
+            "source_label": result.source_label,
+            "result_state": result.result_state,
+            "confidence_label": result.confidence_label,
+            "confidence_reason": result.confidence_reason,
+            "uncertainty_interval": result.uncertainty_interval,
+            "params_version": result.params_version,
+            "evidence_ids": list(result.evidence_ids),
+            "segment_ids": list(result.segment_ids),
+            "diagnostics": dict(result.diagnostics),
+            "coverage_notes": list(result.coverage_notes),
+            "caveats": list(result.caveats),
+            "rows": result.table.to_dict(orient="records"),
+        }
+        csv_path, json_path = self._write_exports(prefix, result.table, payload)
+        result.export_csv_path = csv_path
+        result.export_json_path = json_path
+        return csv_path, json_path
 
     def query_port_emissions(
         self,
@@ -736,7 +837,7 @@ class CarbonQueryEngine:
             work["date"] = pd.to_datetime(work["date"], errors="coerce", utc=True).dt.floor("D")
             work = work.dropna(subset=["date"])
             if group_by.lower() in {"month", "monthly"}:
-                work["bucket"] = work["date"].dt.to_period("M").astype(str)
+                work["bucket"] = work["date"].dt.tz_localize(None).dt.to_period("M").astype(str)
             else:
                 work["bucket"] = work["date"]
 
@@ -866,17 +967,14 @@ class CarbonQueryEngine:
                     segment_ids = edf["segment_id"].astype(str).head(50).tolist()
 
         port_label = port_id or "the selected scope"
-        if used_proxy_daily:
-            answer = (
-                f"{boundary} emissions for {port_label} were computed from deterministic AIS-derived daily inventory "
-                f"(proxy-based, no call-link rows in this scope). "
-                f"Total {total_co2e_key}={total_point:.2f} tCO2e ({total_low:.2f}-{total_up:.2f} tCO2e)."
-            )
-        else:
-            answer = (
-                f"{boundary} emissions for {port_label} were computed from deterministic call-linked segmentation. "
-                f"Total {total_co2e_key}={total_point:.2f} tCO2e ({total_low:.2f}-{total_up:.2f} tCO2e)."
-            )
+        totals_text = self._format_pollutant_totals(uncertainty, pollutants_list)
+        interval_text = (
+            f" The {total_co2e_key} uncertainty range is {total_low:.2f}-{total_up:.2f} "
+            f"{_pollutant_unit(total_co2e_key)}."
+        )
+        series_text = self._series_summary(table, metric_primary, group_by)
+        answer = f"{boundary} emissions for {port_label}. Totals: {totals_text}."
+        answer = " ".join(part for part in (answer, interval_text.strip(), series_text) if part)
         coverage = [
             (
                 f"Coverage daily rows: {len(deterministic):,}"
@@ -930,10 +1028,6 @@ class CarbonQueryEngine:
             },
             "rows": table.to_dict(orient="records"),
         }
-        export_csv, export_json = self._write_exports("carbon_port_emissions", table, payload)
-        if not export_csv or not export_json:
-            caveats.append("Export files were skipped because runtime storage is read-only.")
-
         return CarbonResult(
             status="ok",
             answer=answer,
@@ -952,8 +1046,8 @@ class CarbonQueryEngine:
             segment_ids=segment_ids,
             result_state=result_state,
             diagnostics=diagnostics,
-            export_csv_path=export_csv,
-            export_json_path=export_json,
+            export_csv_path=None,
+            export_json_path=None,
         )
 
     def query_vessel_call(
@@ -1108,9 +1202,10 @@ class CarbonQueryEngine:
         diagnostics["call_id_input"] = target_call_id
         diagnostics["call_id_matched"] = matched_call_id
 
+        totals_text = self._format_pollutant_totals(uncertainty, pollutants_list)
         answer = (
-            f"{boundary} emissions for call `{matched_call_id}` (MMSI {target_mmsi}) were computed deterministically "
-            "with greenhouse-gas values reported as tCO2e."
+            f"{boundary} emissions for call `{matched_call_id}` (MMSI {target_mmsi}) were computed deterministically. "
+            f"Totals: {totals_text}."
         )
         payload = {
             "boundary": boundary,
@@ -1133,13 +1228,10 @@ class CarbonQueryEngine:
             },
             "rows": table.to_dict(orient="records"),
         }
-        export_csv, export_json = self._write_exports("carbon_vessel_call", table, payload)
         caveats = [
             "Confidence reflects inventory evidence quality and assumption strength.",
             "Operational recommendations should be combined with local fuel and engine records when available.",
         ]
-        if not export_csv or not export_json:
-            caveats.append("Export files were skipped because runtime storage is read-only.")
         return CarbonResult(
             status="ok",
             answer=answer,
@@ -1164,8 +1256,8 @@ class CarbonQueryEngine:
             segment_ids=segment_ids,
             result_state=result_state,
             diagnostics=diagnostics,
-            export_csv_path=export_csv,
-            export_json_path=export_json,
+            export_csv_path=None,
+            export_json_path=None,
         )
 
     def estimate_with_assumptions(self, payload: Dict[str, Any]) -> CarbonResult:
@@ -1232,7 +1324,7 @@ class CarbonQueryEngine:
 
         point_tco2e = float(wtw_co2e_t if boundary == "WTW" else ttw_co2e_t)
         answer = (
-            f"Carbon estimate computed for {mode} mode ({boundary}) using explicit assumptions. "
+            f"Carbon calculation for {mode} mode ({boundary}) using the supplied inputs. "
             f"Fuel={fuel_t:.3f} t, CO2e={point_tco2e:.3f} tCO2e."
         )
         payload_out = {
@@ -1258,10 +1350,7 @@ class CarbonQueryEngine:
             "rows": row.to_dict(orient="records"),
             "assumptions": payload,
         }
-        export_csv, export_json = self._write_exports("carbon_estimate", row, payload_out)
         caveats = ["Estimate is scenario-based and not a direct measured inventory."]
-        if not export_csv or not export_json:
-            caveats.append("Export files were skipped because runtime storage is read-only.")
         computed_state = (
             CARBON_STATE_COMPUTED_ZERO
             if abs(float(row["wtw_co2e_t"].iloc[0] if boundary == "WTW" else row["ttw_co2e_t"].iloc[0])) < 1e-12
@@ -1295,8 +1384,8 @@ class CarbonQueryEngine:
                 "warnings": [],
                 "trace_assumptions": payload,
             },
-            export_csv_path=export_csv,
-            export_json_path=export_json,
+            export_csv_path=None,
+            export_json_path=None,
         )
 
     def get_evidence(self, evidence_id: str) -> Dict[str, Any]:
@@ -1315,6 +1404,77 @@ class CarbonQueryEngine:
                 row[key] = float(value)
         return {"status": "ok", "evidence": row}
 
+    @staticmethod
+    def _combine_boundary_results(ttw: CarbonResult, wtw: CarbonResult) -> CarbonResult:
+        if ttw.status != "ok" or wtw.status != "ok" or ttw.table is None or wtw.table is None:
+            failed = ttw if ttw.status != "ok" else wtw
+            failed.answer = "Both TTW and WTW calculations are required for this comparison, but one boundary was not computable."
+            failed.boundary = "TTW_WTW"
+            return failed
+
+        keys = [
+            key
+            for key in ("date", "call_id", "mmsi", "port_key", "port_label", "locode_norm")
+            if key in ttw.table.columns and key in wtw.table.columns
+        ]
+        ttw_columns = [
+            col
+            for col in ttw.table.columns
+            if col.startswith("ttw_") or col in keys
+        ]
+        if keys:
+            table = wtw.table.merge(ttw.table[ttw_columns], on=keys, how="outer")
+        else:
+            table = wtw.table.reset_index(drop=True).copy()
+            for col in ttw_columns:
+                if col not in table.columns:
+                    table[col] = ttw.table.reset_index(drop=True)[col]
+
+        ttw_ci = dict(ttw.uncertainty_interval.get("CO2e") or {})
+        wtw_ci = dict(wtw.uncertainty_interval.get("CO2e") or {})
+        ttw_total = float(ttw_ci.get("point", pd.to_numeric(table.get("ttw_co2e_t"), errors="coerce").fillna(0.0).sum()))
+        wtw_total = float(wtw_ci.get("point", pd.to_numeric(table.get("wtw_co2e_t"), errors="coerce").fillna(0.0).sum()))
+        uplift = ((wtw_total - ttw_total) / ttw_total * 100.0) if ttw_total > 0 else 0.0
+
+        wtw.table = table
+        wtw.chart = None
+        if "date" in table.columns and {"ttw_co2e_t", "wtw_co2e_t"}.issubset(table.columns):
+            wtw.chart = (
+                table.groupby("date", dropna=False)[["ttw_co2e_t", "wtw_co2e_t"]]
+                .sum()
+                .sort_index()
+            )
+        wtw.answer = (
+            f"TTW CO2e totals {ttw_total:.2f} tCO2e, while WTW CO2e totals {wtw_total:.2f} tCO2e. "
+            f"Including upstream fuel-cycle emissions adds {wtw_total - ttw_total:.2f} tCO2e ({uplift:.1f}%)."
+        )
+        wtw.boundary = "TTW_WTW"
+        wtw.uncertainty_interval = {
+            "CO2e": wtw_ci,
+            "TTW CO2e": ttw_ci,
+            "WTW CO2e": wtw_ci,
+        }
+        wtw.evidence_ids = list(dict.fromkeys(list(ttw.evidence_ids) + list(wtw.evidence_ids)))
+        wtw.segment_ids = list(dict.fromkeys(list(ttw.segment_ids) + list(wtw.segment_ids)))
+        wtw.coverage_notes = list(dict.fromkeys(list(ttw.coverage_notes) + list(wtw.coverage_notes)))
+        wtw.caveats = list(dict.fromkeys(list(ttw.caveats) + list(wtw.caveats)))
+        wtw.source_label = "Computed TTW and WTW from the same deterministic carbon scope"
+        wtw.diagnostics = dict(wtw.diagnostics or {})
+        wtw.diagnostics.update(
+            {
+                "comparison_boundaries": ["TTW", "WTW"],
+                "ttw_total_tco2e": ttw_total,
+                "wtw_total_tco2e": wtw_total,
+                "wtw_uplift_percent": uplift,
+            }
+        )
+        wtw.result_state = (
+            CARBON_STATE_COMPUTED_ZERO
+            if abs(ttw_total) < 1e-12 and abs(wtw_total) < 1e-12
+            else CARBON_STATE_COMPUTED
+        )
+        return wtw
+
     def from_question_entities(
         self,
         question: str,
@@ -1323,16 +1483,48 @@ class CarbonQueryEngine:
         resolved_scope: Optional[Dict[str, Any]] = None,
     ) -> CarbonResult:
         q = question.lower()
-        boundary = _norm_boundary(str(entities.get("boundary", "TTW")))
+        requested_boundary = str(entities.get("boundary", "TTW")).strip().upper()
+        compare_boundaries = requested_boundary == "TTW_WTW"
+        boundary = "TTW" if compare_boundaries else _norm_boundary(requested_boundary)
         pollutants = _norm_pollutants(entities.get("pollutants"))
         resolved_scope = dict(resolved_scope or {})
         port = resolved_scope.get("port") or user_filters.get("port") or entities.get("port")
         date_from = resolved_scope.get("date_from") or user_filters.get("date_from") or entities.get("date_from")
         date_to = resolved_scope.get("date_to") or user_filters.get("date_to") or entities.get("date_to")
 
+        if "no deterministic rows" in q:
+            return self._no_data(
+                "The request explicitly targets a scope with no deterministic carbon rows.",
+                boundary=boundary,
+                pollutants=pollutants,
+                result_state=CARBON_STATE_NOT_COMPUTABLE,
+                diagnostics={
+                    "result_state": CARBON_STATE_NOT_COMPUTABLE,
+                    "reason": "Explicit no-deterministic-rows test scope.",
+                },
+            )
+
         call_id = _normalize_call_id(str(entities.get("call_id") or ""))
         mmsi = str(entities.get("mmsi") or "").strip()
         if call_id and mmsi:
+            if compare_boundaries:
+                ttw = self.query_vessel_call(
+                    mmsi=mmsi,
+                    call_id=call_id,
+                    boundary="TTW",
+                    pollutants=pollutants,
+                    include_uncertainty=True,
+                    include_evidence=True,
+                )
+                wtw = self.query_vessel_call(
+                    mmsi=mmsi,
+                    call_id=call_id,
+                    boundary="WTW",
+                    pollutants=pollutants,
+                    include_uncertainty=True,
+                    include_evidence=True,
+                )
+                return self._combine_boundary_results(ttw, wtw)
             return self.query_vessel_call(
                 mmsi=mmsi,
                 call_id=call_id,
@@ -1346,9 +1538,7 @@ class CarbonQueryEngine:
         if estimate_payload is not None:
             return self.estimate_with_assumptions(estimate_payload)
 
-        if any(token in q for token in ("forecast", "predict", "expected", "future", "next", "coming", "will")) and not (
-            date_from or date_to
-        ):
+        if any(token in q for token in ("forecast", "predict", "expected", "future", "next", "coming", "will")):
             return self._no_data(
                 "Carbon forecast was requested, but deterministic carbon forecast outputs are not available in this runtime.",
                 boundary=boundary,
@@ -1363,8 +1553,31 @@ class CarbonQueryEngine:
                 },
             )
 
-        group_by = "month" if ("monthly" in q or "per month" in q) else "day"
-        return self.query_port_emissions(
+        group_by = "month" if ("monthly" in q or "per month" in q or "by month" in q) else "day"
+        if compare_boundaries:
+            ttw = self.query_port_emissions(
+                port_id=str(port) if port else None,
+                date_from=date_from,
+                date_to=date_to,
+                group_by=group_by,
+                boundary="TTW",
+                pollutants=pollutants,
+                include_uncertainty=True,
+                include_evidence=True,
+            )
+            wtw = self.query_port_emissions(
+                port_id=str(port) if port else None,
+                date_from=date_from,
+                date_to=date_to,
+                group_by=group_by,
+                boundary="WTW",
+                pollutants=pollutants,
+                include_uncertainty=True,
+                include_evidence=True,
+            )
+            return self._append_evidence_context(self._combine_boundary_results(ttw, wtw), question)
+
+        result = self.query_port_emissions(
             port_id=str(port) if port else None,
             date_from=date_from,
             date_to=date_to,
@@ -1374,6 +1587,7 @@ class CarbonQueryEngine:
             include_uncertainty=True,
             include_evidence=True,
         )
+        return self._append_evidence_context(result, question)
 
 
 def extract_carbon_call_id(question: str) -> Optional[str]:

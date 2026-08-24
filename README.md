@@ -1,372 +1,107 @@
-# Eagle Eye Congestion + Carbon + Forecast + RAG Evidence
+# Eagle Eye Maritime Intelligence
 
-This project uses:
-- `PRJ912.csv` (AIS telemetry)
-- `PRJ896.csv` (port calls)
-- Optional docs (NIS2 PDF + public ISPS pages)
+Eagle Eye is a correctness-first maritime analytics workspace. Its public
+interface is a custom React maritime-operations workspace served by the
+canonical FastAPI service. The previous Streamlit interface remains available
+as an internal QA and rollback surface.
 
-It now has three layers:
-1. Deterministic analytics/forecast (source of truth for counts, congestion, trends)
-2. Deterministic carbon inventory (TTW pollutants + WTW CO2e, with uncertainty + provenance)
-3. Optional RAG evidence (representative examples, not numeric truth)
+The product deliberately separates three modes:
 
-## 0) Recommended Free Deployment
+- deterministic analytics over versioned historical data;
+- source-grounded maritime research, local documents first;
+- general assistance, with current web grounding when explicitly enabled.
 
-The recommended **fully free** deployment is:
-- run Eagle Eye on **your own Mac**
-- use the **full local `data/processed` and `data/chroma`**
-- expose the current Streamlit UI through a **free public tunnel**
+Unsupported, ambiguous, or current-operational requests return specific states
+instead of falling back to an unrelated metric.
 
-This is the only realistic way to keep **full parity** with your local model at zero infrastructure cost.
+Public results follow a high-or-unavailable assurance policy. A numeric or
+current factual claim is published only after its result-specific checks pass;
+otherwise the response explains why the result is unavailable. Legacy stored
+Medium or Low results are labelled as unverified and are never rerun silently.
 
-One-command launcher:
+The bounded live-data exception is ETA Watch. It uses AISStream vessel
+broadcasts for a curated Sweden-first Baltic destination catalog and can report
+fresh vessel-reported destinations, ETAs, point positions, speeds, signal
+quality, and ETA revisions. The feed is non-exhaustive and is never described
+as an official schedule, confirmed delay, arrival confirmation, or Eagle Eye
+prediction. The page never substitutes the historical 2022 pressure proxy as a
+live ETA.
 
-```bash
-./run_free_public_app.sh
-```
+## Start locally
 
-What it does:
-- checks Docker Desktop is running
-- checks `OPENAI_API_KEY`
-- checks full local assets exist
-- builds the Streamlit Docker image
-- runs the UI container on port `8501`
-- opens a free public tunnel (`cloudflared` by default, `ngrok` supported)
-- prints the public URL
-
-Required local inputs:
-- `data/processed/arrivals_daily.parquet`
-- `data/processed/events.parquet`
-- `data/chroma/chroma.sqlite3`
-- `data/chroma/traffic_metadata_index.csv`
-- `OPENAI_API_KEY` in shell or `.env`
-
-Important:
-- the public URL is temporary
-- it only stays live while your Mac is on
-- Docker Desktop and the tunnel process must keep running
-- this free path does **not** need Streamlit Cloud, remote Chroma, or hosted bundles
-- `data/chroma` is mounted read-write so local retrieval provenance works inside Docker
-
-Optional stable URL modes:
-- `NGROK_DOMAIN=<your-domain.ngrok-free.app> ./run_free_public_app.sh` (requires ngrok auth + reserved domain)
-- `CLOUDFLARE_TUNNEL_TOKEN=... CLOUDFLARE_TUNNEL_HOSTNAME=<host.yourdomain.com> ./run_free_public_app.sh`
-
-## 1) Mac Setup
+Prerequisites are Python 3.12, `uv`, and the local data bundle.
 
 ```bash
-cd "/Users/praharshchintu/Documents/New project"
-python3.12 -m venv .venv
-source .venv/bin/activate
-python -m pip install --upgrade pip
-python -m pip install -r requirements.txt
+cd /Users/praharshchintu/dev/EagleEye
+./scripts/bootstrap_runtime.sh
+./run_eagle_eye.sh
 ```
 
-Set API key (only needed for RAG index + evidence retrieval):
+Open `http://127.0.0.1:8000`.
+
+The React workspace provides Overview, Analysis Desk, Traffic Monitoring,
+Vessel Investigation, ETA Watch, Port Pressure, and the exact
+`Carbon Emissions` label. Advanced and voyage-grade modes remain absent from
+public navigation. `/eta-delay` and the internal `ETA & Delay` identifier remain
+unchanged for compatibility.
+
+The production frontend must be built before first launch:
 
 ```bash
-export OPENAI_API_KEY="YOUR_OPENAI_API_KEY"
+npm --prefix web ci
+npm --prefix web run build
 ```
 
-Or place it in a local `.env` file:
+To run the unchanged Streamlit QA surface on its traditional port:
 
 ```bash
-cp .env.example .env
+PORT=8501 ./run_streamlit.sh
 ```
 
-## 2) Data Inputs
+The small canonical response inspector remains available directly in
+`src/app/streamlit_canonical.py` for backend QA.
 
-Put files in `/Users/praharshchintu/Documents/New project/data/`:
-- `PRJ912.csv`
-- `PRJ896.csv`
-- `CELEX_32022L2555_EN_TXT.pdf` (recommended)
-- `ILOIMOCodeOfPracticeEnglish.pdf` (optional)
+## Security and model routes
 
-For ISPS, prefer public official pages via URLs, not unofficial full-text PDFs.
+Copy `.env.example` to `.env`, keep `.env` at mode `600`, and never commit it.
+Model-backed routes are disabled by default and require both a rotated API key
+and `EAGLE_EYE_ENABLE_MODEL_RESPONSES=true`. Deterministic analytics remain the
+sole numeric authority even when models are enabled.
 
-## 3) One-Command Pipeline
+ETA Watch requires a backend-only `AISSTREAM_API_KEY`. Keep the key in the
+mode-`600` local `.env`; it is sent only in the AISStream WebSocket subscription
+frame and is never returned by an API response or written to logs.
+
+## API
+
+- `POST /api/v2/query` returns the complete `AnswerEnvelope`.
+- `POST /api/v2/query/stream` emits progress and text events, then that same
+  final envelope.
+- `GET /api/v2/capabilities` reports supported operations and data freshness.
+- `POST /api/v2/exports` is the only query-result export path.
+- `POST /api/v2/feedback` records a trace-linked issue report for review.
+
+Legacy `/ask` and `/api/v1/chat` routes are adapters over the canonical service.
+
+## Verify
+
+The public source publication can be checked without the restricted thesis
+workspace:
 
 ```bash
-./run_demo_pipeline.sh
+shasum -a 256 -c release/github_source_snapshot.sha256
+python3 scripts/secret_scan.py \
+  --root . \
+  --allowlist release/public_secret_scan_allowlist.json
+npm --prefix web ci
+npm --prefix web run build
 ```
 
-This runs, in order:
-1. `src.predict.data_prep`
-2. `src.kpi.build_kpis`
-3. `src.carbon.build`
-4. destination / ETA / anomaly training
-5. RAG indexing (if `OPENAI_API_KEY` is set)
+The complete local release gate remains `./scripts/verify_all.sh`. It expects
+the authorised data and thesis evidence workspace, and runs the complete Python
+and frozen regression suites, API hash consistency, production web build,
+dependency audit, Playwright responsive/visual tests, axe accessibility checks,
+and an offline served-application smoke test. No live model call is made.
 
-## 4) Manual Commands
-
-### Build prediction-ready datasets
-```bash
-python -m src.predict.data_prep \
-  --traffic_csv data/PRJ912.csv \
-  --traffic_csvs data/PRJ896.csv \
-  --out_dir data/processed
-```
-
-### Build KPI tables (required for Ask/Forecast tabs)
-```bash
-python -m src.kpi.build_kpis \
-  --traffic_csv data/PRJ912.csv \
-  --traffic_csvs data/PRJ896.csv \
-  --out_dir data/processed
-```
-
-Outputs include:
-- `data/processed/arrivals_daily.parquet`
-- `data/processed/arrivals_hourly.parquet`
-- `data/processed/dwell_time.parquet`
-- `data/processed/occupancy_hourly.parquet`
-- `data/processed/congestion_daily.parquet`
-- `data/processed/kpi_capabilities.json`
-
-### Build carbon layer outputs (TTW + WTW + uncertainty + evidence)
-```bash
-python -m src.carbon.build \
-  --processed_dir data/processed \
-  --out_dir data/processed
-```
-
-Outputs include:
-- `data/processed/carbon_segments.parquet`
-- `data/processed/carbon_emissions_segment.parquet`
-- `data/processed/carbon_emissions_daily_port.parquet`
-- `data/processed/carbon_emissions_call.parquet`
-- `data/processed/carbon_evidence.parquet`
-- `data/processed/carbon_params_version.json`
-
-### Train prediction models
-```bash
-python -m src.predict.train_destination --training_rows data/processed/training_rows.parquet --model_dir models
-python -m src.predict.train_eta --training_rows data/processed/training_rows.parquet --model_dir models
-python -m src.predict.anomaly --training_rows data/processed/training_rows.parquet --model_dir models
-```
-
-### Build RAG index (optional but recommended for evidence)
-```bash
-python -m src.index.build_index \
-  --traffic_csv data/PRJ912.csv \
-  --traffic_csvs data/PRJ896.csv \
-  --persist_dir data/chroma \
-  --pdf_paths data/CELEX_32022L2555_EN_TXT.pdf data/ILOIMOCodeOfPracticeEnglish.pdf \
-  --doc_urls https://www.imo.org/en/OurWork/Security/Pages/SOLAS-XI-2%20ISPS-Code.aspx https://www.mpa.gov.sg/web/portal/home/port-of-singapore/operations-and-services/maritime-security/isps-code
-```
-
-### Forecast backtest
-```bash
-python -m src.forecast.backtest --processed_dir data/processed
-```
-
-## 5) Run Streamlit
-
-```bash
-./run_streamlit.sh
-```
-
-UI:
-- **Ask-only** interface with integrated analytics + forecasting + retrieval evidence trace.
-- Includes answer, evidence, confidence, chart, method steps, and retrieval provenance.
-
-## 5.1) Streamlit Cloud Deploy
-
-Use these exact values in Streamlit Cloud:
-- Repository: `Praharsh-Projects/Eagle_Eye`
-- Branch: `main`
-- Main file path: `app/streamlit_app.py`
-
-For cloud environments where `data/processed` is not present, the app auto-falls back to bundled app runtime KPI data in `demo_data/processed`.
-For cloud environments where `data/chroma` is not present, the app auto-falls back to bundled demo vector index in `demo_data/chroma`.
-
-To enable vector retrieval evidence (`vector_id`, `chunk_id`, distance), set Streamlit secret:
-- `OPENAI_API_KEY = "..."`.
-
-To run full-scale retrieval on cloud (same behavior as local), connect a remote Chroma service:
-- `VECTOR_DB_MODE = "remote"`
-- `CHROMA_HOST = "<your-chroma-host>"`
-- `CHROMA_PORT = "8000"` (or your service port)
-- `CHROMA_SSL = "true"` (for HTTPS services)
-- Optional: `CHROMA_TENANT`, `CHROMA_DATABASE`, `CHROMA_AUTH_TOKEN`, `CHROMA_AUTH_HEADER`
-
-To bootstrap full processed runtime data on cloud from a hosted bundle, set:
-- `APP_PROCESSED_BUNDLE_URL = "https://.../eagle_eye_processed_bundle.tar.gz"`
-- Optional for anomaly/jump detection without retriever:
-- `APP_EVENTS_BUNDLE_URL = "https://.../eagle_eye_events_bundle.tar.gz"`
-- Optional for local-bundle retrieval fallback on hosts with enough disk:
-- `APP_CHROMA_BUNDLE_URL = "https://.../eagle_eye_chroma_bundle.tar.gz"`
-- Or, for large Chroma stores split across multiple hosted files:
-- `APP_CHROMA_MANIFEST_URL = "https://.../eagle_eye_chroma_manifest.json"`
-
-Create that bundle locally:
-```bash
-python -m src.utils.package_cloud_bundle \
-  --processed_dir data/processed \
-  --out dist/eagle_eye_processed_bundle.tar.gz \
-  --events_out dist/eagle_eye_events_bundle.tar.gz \
-  --chroma_dir data/chroma \
-  --chroma_out dist/eagle_eye_chroma_bundle.tar.gz
-```
-
-Index directly to remote service:
-```bash
-export VECTOR_DB_MODE=remote
-export CHROMA_HOST=<your-chroma-host>
-export CHROMA_PORT=8000
-export CHROMA_SSL=true
-python -m src.index.build_index \
-  --traffic_csv data/PRJ912.csv \
-  --traffic_csvs data/PRJ896.csv \
-  --persist_dir data/chroma
-```
-
-Cloud parity summary:
-- Deterministic analytics/forecast parity: bundled in `demo_data/processed`, or bootstrap via `APP_PROCESSED_BUNDLE_URL`
-- Retrieval parity: **not realistic on free Streamlit Cloud** with the full local vector store
-- AIS jump/spoof anomaly parity without retriever: requires `APP_EVENTS_BUNDLE_URL` because those queries need row-level AIS events
-- On non-Streamlit hosts with enough disk, `APP_CHROMA_BUNDLE_URL` or `APP_CHROMA_MANIFEST_URL` can bootstrap a local full vector store
-
-## 6) Congestion Definition (used in code)
-
-Daily congestion proxy per port:
-- `arrivals_ratio = arrivals_day / median(arrivals_port)`
-- `dwell_ratio = median_dwell_day / median(dwell_port)`
-- `congestion_index = arrivals_ratio + dwell_ratio`
-
-If dwell is unavailable, congestion falls back to arrivals-only ratio.
-
-## 7) Supported vs Unsupported
-
-Supported well:
-- arrivals volume, busiest day/hour, dwell proxy, congestion proxy, historical-pattern forecasts
-- TTW pollutants (`CO2e`, `NOx`, `SOx`, `PM`) and WTW `CO2e` with confidence + uncertainty intervals
-
-Out of scope (clean refusal):
-- berth crane utilization
-- gate queue length
-- TEU throughput
-- yard occupancy from terminal ops systems
-
-## 8) Demo Questions
-
-- `How many vessels arrived at LUBECK in March 2022?`
-- `Is Friday usually busier than Monday at LVVNT?`
-- `What will congestion look like next Friday at LUBECK?`
-- `Why was LVVNT congested on 2021-01-01?`
-- `Any unusual spikes in arrivals at GDANSK in 2021-02?`
-- `What are TTW emissions at SEGOT in March 2022 for CO2e, NOx, SOx, and PM?`
-- `Show WTW CO2e emissions at LVVNT between 2022-02-01 and 2022-02-28.`
-
-## 9) Carbon Measurement and Decision-Support UX
-
-Carbon/emissions outputs are standardized with shared formatting and interpretation helpers:
-- Absolute greenhouse-gas values are shown in `tCO2e` and auto-scale to `ktCO2e` / `MtCO2e` for large totals.
-- Intensity metrics are shown with explicit units such as:
-  - `kgCO2e/vessel-call`
-  - `tCO2e/day`
-  - `kgCO2e/hour`
-- Congestion stays dimensionless and is labelled as `index`.
-- Maritime operational units remain:
-  - distance = `nautical miles (nm)`
-  - speed = `knots (kn)`
-  - time = `UTC` (24-hour)
-
-Carbon result views now include:
-- unit-aware metric cards
-- relative comparison bar (`Low/Moderate/High/Very High`) based on dataset percentiles
-- chart annotations (`Finding: ...`) for highest/lowest/spike/drop/selected period
-- deterministic `Findings` panel
-- `How To Reduce Emissions` panel with 3-5 operational actions tied to the current pattern
-- strict carbon result-state gating:
-  - `COMPUTED`
-  - `COMPUTED_ZERO`
-  - `NOT_COMPUTABLE`
-  - `RETRIEVAL_ONLY`
-  - `FORECAST_ONLY`
-  - `UNSUPPORTED`
-
-For non-computable carbon states (`NOT_COMPUTABLE`, `RETRIEVAL_ONLY`, `FORECAST_ONLY`, `UNSUPPORTED`):
-- numeric emissions cards are shown as `N/A` (never fake `0.00 tCO2e`)
-- percentage deltas and relative level bars are suppressed
-- deterministic and retrieved evidence are shown in separate blocks
-- findings and recommendations switch to data-quality guidance
-
-Configurable threshold source (single place):
-- `config/config.yaml` -> `carbon.relative_level_percentiles` (default `[0.25, 0.50, 0.75]`)
-
-## 10) Tests
-
-Run unit tests for emissions presentation logic:
-
-```bash
-python -m unittest discover -s tests -p "test_*.py"
-```
-
-## 11) Troubleshooting
-
-- If Chroma fails with Python 3.14, recreate `.venv` with Python 3.12.
-- If RAG evidence is unavailable, ensure `OPENAI_API_KEY` is exported in the same terminal.
-- If retrieval is disabled on cloud, check Streamlit secrets for `OPENAI_API_KEY` and `CHROMA_*` variables.
-- If cloud is still on partial coverage, verify whether the sidebar shows `demo_data/processed`; if so, either upload the processed bundle or set `APP_PROCESSED_BUNDLE_URL`.
-- If Ask has no deterministic output, run `python -m src.kpi.build_kpis ...` first.
-
-## 12) Optional Hosted Deployment Alternatives
-
-Streamlit Cloud is not a good target for the full local model because the local Chroma store is several GB.
-If you later move beyond the free local deployment, use one of these paths:
-- FastAPI on a host with disk
-- Streamlit on a host with attached storage
-- FastAPI + remote Chroma
-
-### Run locally
-
-```bash
-./run_api.sh
-```
-
-API endpoints:
-- `GET /health`
-- `POST /ask`
-- Swagger docs at `http://localhost:8000/docs`
-
-### Docker run (API path)
-
-```bash
-docker build -t eagle-eye-api -f Dockerfile.api .
-docker run --rm -p 8000:8000 \
-  -e OPENAI_API_KEY="..." \
-  -e APP_PROCESSED_BUNDLE_URL="https://.../eagle_eye_processed_bundle.tar.gz" \
-  -e APP_EVENTS_BUNDLE_URL="https://.../eagle_eye_events_bundle.tar.gz" \
-  -e APP_CHROMA_MANIFEST_URL="https://.../eagle_eye_chroma_manifest.json" \
-  eagle-eye-api
-```
-
-### Recommended production modes
-
-1. `FastAPI + remote Chroma`
-- Best when you already operate a Chroma service.
-- Set `VECTOR_DB_MODE=remote` plus `CHROMA_*` variables.
-
-2. `FastAPI + local bundle bootstrap`
-- Best when you want one deployed service and can attach disk.
-- Set:
-  - `APP_PROCESSED_BUNDLE_URL`
-  - `APP_EVENTS_BUNDLE_URL`
-  - `APP_CHROMA_BUNDLE_URL`
-  - or `APP_CHROMA_MANIFEST_URL`
-- Do not set `VECTOR_DB_MODE=remote`.
-
-This repo also includes `render.yaml` for the optional API deployment path and it now points to `Dockerfile.api`.
-
-### Example request
-
-```bash
-curl -X POST http://localhost:8000/ask \
-  -H "Content-Type: application/json" \
-  -d '{
-    "question": "What will congestion be at LVVNT on Friday, February 20, 2026?",
-    "top_k_evidence": 5,
-    "filters": {"port": "LVVNT"}
-  }'
-```
+See `docs/EAGLE_EYE_PAGES_TESTING_AND_DATA_GUIDE.md` for the data boundary,
+runtime details, and endpoint inventory.

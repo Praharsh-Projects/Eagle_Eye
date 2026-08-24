@@ -1,0 +1,134 @@
+{
+  "type": "FeatureCollection",
+  "dataUpdatedTime": "2026-07-27T11:59:00Z",
+  "features": [
+    {
+      "mmsi": 265111000,
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [18.228, 59.214]
+      },
+      "properties": {
+        "mmsi": 265111000,
+        "sog": 12.4,
+        "cog": 332.0,
+        "navStat": 0,
+        "heading": 331,
+        "timestampExternal": 1785153480000
+      }
+    },
+    {
+      "mmsi": 266111001,
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [18.583, 57.612]
+      },
+      "properties": {
+        "mmsi": 266111001,
+        "sog": 15.2,
+        "cog": 147.0,
+        "navStat": 0,
+        "heading": 146,
+        "timestampExternal": 1785153420000
+      }
+    },
+    {
+      "mmsi": 265111002,
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [18.861, 60.384]
+      },
+      "properties": {
+        "mmsi": 265111002,
+        "sog": 11.8,
+        "cog": 317.0,
+        "navStat": 0,
+        "heading": 315,
+        "timestampExternal": 1785153360000
+      }
+    },
+    {
+      "mmsi": 265111003,
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [12.744, 55.558]
+      },
+      "properties": {
+        "mmsi": 265111003,
+        "sog": 10.9,
+        "cog": 94.0,
+        "navStat": 0,
+        "heading": 93,
+        "timestampExternal": 1785153480000
+      }
+    },
+    {
+      "mmsi": 265111004,
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [18.021, 58.816]
+      },
+      "properties": {
+        "mmsi": 265111004,
+        "sog": 13.6,
+        "cog": 354.0,
+        "navStat": 0,
+        "heading": 352,
+        "timestampExternal": 1785153300000
+      }
+    },
+    {
+      "mmsi": 276111000,
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [24.401, 59.721]
+      },
+      "properties": {
+        "mmsi": 276111000,
+        "sog": 12.1,
+        "cog": 132.0,
+        "navStat": 0,
+        "heading": 131,
+        "timestampExternal": 1785153420000
+      }
+    },
+    {
+      "mmsi": 275111000,
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [23.491, 57.269]
+      },
+      "properties": {
+        "mmsi": 275111000,
+        "sog": 11.4,
+        "cog": 158.0,
+        "navStat": 0,
+        "heading": 157,
+        "timestampExternal": 1785153360000
+      }
+    },
+    {
+      "mmsi": 277111000,
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [20.874, 56.348]
+      },
+      "properties": {
+        "mmsi": 277111000,
+        "sog": 10.6,
+        "cog": 119.0,
+        "navStat": 0,
+        "heading": 118,
+        "timestampExternal": 1785153300000
+      }
+    }
+  ]
+}

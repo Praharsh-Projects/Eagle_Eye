@@ -1,0 +1,518 @@
+{
+  "available_ports": [
+    "EEKND",
+    "EEMUG",
+    "EEPLA",
+    "EEPRN",
+    "EESLM",
+    "EETLL",
+    "EEVIR",
+    "FIHEL",
+    "FIHKO",
+    "FIHMN",
+    "FIINK",
+    "FIKAS",
+    "FIKEM",
+    "FIKOK",
+    "FIKRS",
+    "FIKTK",
+    "FIKVH",
+    "FILAN",
+    "FILOV",
+    "FIMHQ",
+    "FIMTY",
+    "FINLI",
+    "FIOUL",
+    "FIPAR",
+    "FIPOA",
+    "FIPRS",
+    "FIRAA",
+    "FIRAH",
+    "FIRAU",
+    "FITHK",
+    "FITKU",
+    "FITOK",
+    "FITOR",
+    "FIUKI",
+    "FIVAA",
+    "FIVEI",
+    "LTKLJ",
+    "LVLPX",
+    "LVRIX",
+    "LVSAL",
+    "LVSKU",
+    "LVVNT",
+    "PLDAR",
+    "PLELB",
+    "PLGDN",
+    "PLGDY",
+    "PLKOL",
+    "PLPLC",
+    "PLSWI",
+    "PLSZZ",
+    "PLUST",
+    "SEAHU",
+    "SEBOL",
+    "SEBRO",
+    "SEDEG",
+    "SEDOM",
+    "SEFAG",
+    "SEFSD",
+    "SEGOT",
+    "SEGUS",
+    "SEGVX",
+    "SEHAD",
+    "SEHAK",
+    "SEHAN",
+    "SEHEL",
+    "SEHND",
+    "SEHOG",
+    "SEHUS",
+    "SEHUV",
+    "SEIGG",
+    "SEKAA",
+    "SEKAN",
+    "SEKAS",
+    "SEKLI",
+    "SEKLR",
+    "SEKMH",
+    "SEKOG",
+    "SEKPS",
+    "SEKRF",
+    "SEKXV",
+    "SELAA",
+    "SELLA",
+    "SELYS",
+    "SEMMA",
+    "SEMON",
+    "SENCS",
+    "SENOL",
+    "SENOT",
+    "SENRK",
+    "SENYN",
+    "SEOBB",
+    "SEOER",
+    "SEOSK",
+    "SEOTT",
+    "SEOXE",
+    "SEPIT",
+    "SERUV",
+    "SESAE",
+    "SESDL",
+    "SESKE",
+    "SESLI",
+    "SESOE",
+    "SESOO",
+    "SESOR",
+    "SESSR",
+    "SESTE",
+    "SESTK",
+    "SESTO",
+    "SESUS",
+    "SETRG",
+    "SEUDD",
+    "SEULF",
+    "SEUME",
+    "SEUTA",
+    "SEVAG",
+    "SEVAJ",
+    "SEVAL",
+    "SEVBY",
+    "SEVID",
+    "SEVIV",
+    "SEVST",
+    "SEVVK",
+    "SEWAL",
+    "SEYST"
+  ],
+  "built_at_utc": "2026-08-24T13:11:45.473807Z",
+  "capabilities": {
+    "date_max": "2022-04-30",
+    "date_min": "2021-01-01",
+    "has_ais_destination_proxy": true,
+    "has_dwell_time": true,
+    "has_occupancy_hourly": true,
+    "has_port_calls": true,
+    "ports": 8375
+  },
+  "data_contract": {
+    "forecast_gate": {
+      "interval_80_coverage_max": 0.9,
+      "interval_80_coverage_min": 0.7,
+      "mase_lt": 1.0,
+      "maximum_horizon_days": 56
+    },
+    "historical_only": true,
+    "pressure_version": "pressure_v2",
+    "voyage_reconstruction_version": "voyage_reconstruction_v1"
+  },
+  "enabled_operations": [
+    "anomaly_detection",
+    "arrival_composition",
+    "arrivals",
+    "carbon_emissions",
+    "dwell_distribution",
+    "pressure_v2",
+    "temporal_patterns"
+  ],
+  "model_validation": {
+    "anomaly": {
+      "max_rows": 120000,
+      "rows": 50000,
+      "score_quantiles": {
+        "q01": -0.6756520523047104,
+        "q05": -0.5681575600937439,
+        "q50": -0.3476002144936423
+      },
+      "skipped": false
+    },
+    "destination": {
+      "model_kind": "histgb",
+      "num_classes": 35,
+      "per_class_report": {
+        "BEANR": {
+          "f1-score": 0.4854368932038835,
+          "precision": 0.3768844221105528,
+          "recall": 0.6818181818181818,
+          "support": 110.0
+        },
+        "DEHAM": {
+          "f1-score": 0.3864734299516908,
+          "precision": 0.31496062992125984,
+          "recall": 0.5,
+          "support": 80.0
+        },
+        "DELBC": {
+          "f1-score": 0.4583333333333333,
+          "precision": 0.6666666666666666,
+          "recall": 0.3492063492063492,
+          "support": 63.0
+        },
+        "DERSK": {
+          "f1-score": 0.3741935483870968,
+          "precision": 0.43283582089552236,
+          "recall": 0.32954545454545453,
+          "support": 88.0
+        },
+        "DKSKA": {
+          "f1-score": 0.2033898305084746,
+          "precision": 0.48,
+          "recall": 0.12903225806451613,
+          "support": 93.0
+        },
+        "GDANSK": {
+          "f1-score": 0.008733624454148471,
+          "precision": 0.010526315789473684,
+          "recall": 0.007462686567164179,
+          "support": 134.0
+        },
+        "GDYNIA": {
+          "f1-score": 0.21739130434782608,
+          "precision": 0.27472527472527475,
+          "recall": 0.17985611510791366,
+          "support": 139.0
+        },
+        "KLAIPEDA": {
+          "f1-score": 0.041666666666666664,
+          "precision": 0.0380952380952381,
+          "recall": 0.04597701149425287,
+          "support": 87.0
+        },
+        "LTKLJ": {
+          "f1-score": 0.15819209039548024,
+          "precision": 0.2641509433962264,
+          "recall": 0.11290322580645161,
+          "support": 124.0
+        },
+        "LUBECK": {
+          "f1-score": 0.46,
+          "precision": 0.6216216216216216,
+          "recall": 0.36507936507936506,
+          "support": 63.0
+        },
+        "LVLPX": {
+          "f1-score": 0.0,
+          "precision": 0.0,
+          "recall": 0.0,
+          "support": 60.0
+        },
+        "LVRIX": {
+          "f1-score": 0.21428571428571427,
+          "precision": 0.1485148514851485,
+          "recall": 0.38461538461538464,
+          "support": 78.0
+        },
+        "NLRTM": {
+          "f1-score": 0.49230769230769234,
+          "precision": 0.366412213740458,
+          "recall": 0.75,
+          "support": 64.0
+        },
+        "PLGDN": {
+          "f1-score": 0.4093567251461988,
+          "precision": 0.3349282296650718,
+          "recall": 0.5263157894736842,
+          "support": 133.0
+        },
+        "PLGDY": {
+          "f1-score": 0.2127659574468085,
+          "precision": 0.26785714285714285,
+          "recall": 0.17647058823529413,
+          "support": 85.0
+        },
+        "PLSZZ": {
+          "f1-score": 0.10921501706484642,
+          "precision": 0.128,
+          "recall": 0.09523809523809523,
+          "support": 168.0
+        },
+        "RIGA": {
+          "f1-score": 0.3443708609271523,
+          "precision": 0.2937853107344633,
+          "recall": 0.416,
+          "support": 125.0
+        },
+        "ROSTOCK": {
+          "f1-score": 0.14814814814814814,
+          "precision": 0.2564102564102564,
+          "recall": 0.10416666666666667,
+          "support": 96.0
+        },
+        "RUKGD": {
+          "f1-score": 0.5395348837209303,
+          "precision": 0.42028985507246375,
+          "recall": 0.7532467532467533,
+          "support": 77.0
+        },
+        "RULED": {
+          "f1-score": 0.28498727735368956,
+          "precision": 0.4827586206896552,
+          "recall": 0.20216606498194944,
+          "support": 277.0
+        },
+        "RUPRI": {
+          "f1-score": 0.32460732984293195,
+          "precision": 0.22302158273381295,
+          "recall": 0.5961538461538461,
+          "support": 52.0
+        },
+        "RUULU": {
+          "f1-score": 0.2138364779874214,
+          "precision": 0.2982456140350877,
+          "recall": 0.16666666666666666,
+          "support": 204.0
+        },
+        "ST PETERSBURG": {
+          "f1-score": 0.1382488479262673,
+          "precision": 0.10638297872340426,
+          "recall": 0.19736842105263158,
+          "support": 76.0
+        },
+        "SWINOUJSCIE": {
+          "f1-score": 0.56,
+          "precision": 0.4148148148148148,
+          "recall": 0.8615384615384616,
+          "support": 65.0
+        },
+        "UST LUGA": {
+          "f1-score": 0.27009646302250806,
+          "precision": 0.5,
+          "recall": 0.18502202643171806,
+          "support": 227.0
+        },
+        "macro avg": {
+          "f1-score": 0.28222288465715634,
+          "precision": 0.3088755361673447,
+          "recall": 0.32463397647963205,
+          "support": 2768.0
+        },
+        "micro avg": {
+          "f1-score": 0.28761552680221814,
+          "precision": 0.29447388342165026,
+          "recall": 0.2810693641618497,
+          "support": 2768.0
+        },
+        "weighted avg": {
+          "f1-score": 0.2652524064204573,
+          "precision": 0.317368622596986,
+          "recall": 0.2810693641618497,
+          "support": 2768.0
+        }
+      },
+      "report_top_classes": 25,
+      "test_rows": 2993,
+      "top1_accuracy": 0.2829936518543268,
+      "top5_accuracy": 0.6551954560641496,
+      "train_rows": 13624
+    },
+    "eta": {
+      "mae_minutes": 1489.1310906133942,
+      "max_test_rows": 30000,
+      "max_train_rows": 120000,
+      "median_absolute_error_minutes": 874.8463766262116,
+      "model_kind": "histgb",
+      "rmse_minutes": 2626.5375395308106,
+      "skipped": false,
+      "test_rows": 9357,
+      "train_rows": 37427
+    },
+    "forecast": {
+      "arrivals": {
+        "interval_80_coverage_mean": null,
+        "mase_mean": null,
+        "metric": "arrivals_vessels",
+        "passing_ports": [],
+        "ports_evaluated": 20
+      },
+      "available": true,
+      "congestion": {
+        "interval_80_coverage_mean": null,
+        "mase_mean": null,
+        "metric": "congestion_index",
+        "passing_ports": [],
+        "ports_evaluated": 20
+      },
+      "settings": {
+        "max_ports": 20,
+        "min_history_days": 60,
+        "processed_dir": "data/processed",
+        "test_days": 28
+      }
+    }
+  },
+  "schema_version": "1.0",
+  "tables": {
+    "arrivals_daily.parquet": {
+      "bytes": 508285,
+      "columns": [
+        "source_kind",
+        "port_key",
+        "port_label",
+        "locode_norm",
+        "port_name_norm",
+        "date",
+        "vessel_type_norm",
+        "arrivals_vessels",
+        "arrivals_events",
+        "source_file"
+      ],
+      "coverage": {
+        "date": {
+          "max": "2022-04-30",
+          "min": "2021-01-01"
+        }
+      },
+      "path": "arrivals_daily.parquet",
+      "readable": true,
+      "rows": 103851,
+      "sha256": "7022421ad0c8a3c09127529e5f10864a193f308e121b27af5d1d5c5f07235684"
+    },
+    "arrivals_hourly.parquet": {
+      "bytes": 1195501,
+      "columns": [
+        "source_kind",
+        "port_key",
+        "port_label",
+        "locode_norm",
+        "port_name_norm",
+        "datetime_hour",
+        "vessel_type_norm",
+        "arrivals_vessels",
+        "arrivals_events",
+        "source_file"
+      ],
+      "coverage": {
+        "datetime_hour": {
+          "max": "2022-04-30",
+          "min": "2021-01-01"
+        }
+      },
+      "path": "arrivals_hourly.parquet",
+      "readable": true,
+      "rows": 355688,
+      "sha256": "9b4dd1fd98a4717c20be657a17e778e1d1f5df9419d3796bd729f998c111d72e"
+    },
+    "congestion_daily.parquet": {
+      "bytes": 1292523,
+      "columns": [
+        "source_kind",
+        "port_key",
+        "port_label",
+        "locode_norm",
+        "port_name_norm",
+        "date",
+        "arrivals_vessels",
+        "arrivals_events",
+        "median_dwell_minutes",
+        "has_dwell",
+        "arrivals_ratio",
+        "dwell_ratio",
+        "congestion_index"
+      ],
+      "coverage": {
+        "date": {
+          "max": "2022-04-30",
+          "min": "2021-01-01"
+        }
+      },
+      "path": "congestion_daily.parquet",
+      "readable": true,
+      "rows": 85605,
+      "sha256": "c1769b92c580fc9fcb59551330fc132de78129ba3025769592389bb72e221ea3"
+    },
+    "dwell_time.parquet": {
+      "bytes": 2490270,
+      "columns": [
+        "source_kind",
+        "port_key",
+        "port_label",
+        "locode_norm",
+        "port_name_norm",
+        "mmsi",
+        "vessel_type_norm",
+        "arrival_time",
+        "departure_time",
+        "dwell_minutes",
+        "arrival_date",
+        "source_file"
+      ],
+      "coverage": {
+        "arrival_time": {
+          "max": "2022-04-30",
+          "min": "2021-01-01"
+        },
+        "departure_time": {
+          "max": "2022-05-05",
+          "min": "2021-01-01"
+        }
+      },
+      "path": "dwell_time.parquet",
+      "readable": true,
+      "rows": 82423,
+      "sha256": "241547933e069bda16102ad36d9b861aa3fa4077df3cef8da26b209e89db070a"
+    },
+    "occupancy_hourly.parquet": {
+      "bytes": 1791468,
+      "columns": [
+        "source_kind",
+        "port_key",
+        "port_label",
+        "locode_norm",
+        "port_name_norm",
+        "datetime_hour",
+        "occupancy_vessels",
+        "occupancy_events"
+      ],
+      "coverage": {
+        "datetime_hour": {
+          "max": "2022-05-05",
+          "min": "2021-01-01"
+        }
+      },
+      "path": "occupancy_hourly.parquet",
+      "readable": true,
+      "rows": 754131,
+      "sha256": "11ae7b09cd3d680ef7c42753896c4ee33282b3a8547aa4b915ad7f4314780efe"
+    }
+  }
+}

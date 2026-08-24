@@ -1,0 +1,38 @@
+name: Canonical source verification
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
+      - name: Verify frozen source hashes
+        run: shasum -a 256 -c release/github_source_snapshot.sha256
+
+      - name: Scan the public publication for secrets
+        run: >-
+          python3 scripts/secret_scan.py
+          --root .
+          --allowlist release/public_secret_scan_allowlist.json
+
+      - name: Install frontend dependencies
+        run: npm --prefix web ci
+
+      - name: Build the React workspace
+        run: npm --prefix web run build

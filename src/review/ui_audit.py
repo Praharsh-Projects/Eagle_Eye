@@ -32,8 +32,8 @@ SCENARIO_PAGE_MAP = {
     "traffic_descriptive": "Traffic Monitoring",
     "vessel_investigation": "Vessel Investigation",
     "forecast": "ETA & Delay",
-    "carbon_deterministic": "Carbon & Emissions",
-    "carbon_no_data": "Carbon & Emissions",
+    "carbon_deterministic": "Carbon Emissions",
+    "carbon_no_data": "Carbon Emissions",
     "unsupported": "Traffic Monitoring",
 }
 
@@ -226,14 +226,20 @@ def _classify_error(exc: Exception) -> Tuple[str, str]:
 def _find_question_input(page: Any, timeout_ms: int) -> Any:
     """Locate question input with semantic-first selectors and fallbacks."""
     candidates: List[Any] = []
+    for label in ("Question", "Analysis request"):
+        try:
+            candidates.append(page.get_by_label(label))
+        except Exception:
+            pass
     try:
-        candidates.append(page.get_by_label("Question"))
+        candidates.append(
+            page.get_by_placeholder(
+                re.compile(r"question|analysis|maritime", re.IGNORECASE)
+            )
+        )
     except Exception:
         pass
-    try:
-        candidates.append(page.get_by_placeholder(re.compile(r"question", re.IGNORECASE)))
-    except Exception:
-        pass
+    candidates.append(page.locator("input[aria-label='Analysis request']").first)
     candidates.append(page.locator("textarea").first)
 
     for cand in candidates:
@@ -247,10 +253,19 @@ def _find_question_input(page: Any, timeout_ms: int) -> Any:
 
 def _select_navigation_page(page: Any, page_name: str, timeout_ms: int) -> bool:
     sidebar = page.locator("section[data-testid='stSidebar']").first
-    candidates = [
-        sidebar.get_by_text(page_name, exact=True).first,
-        page.get_by_text(page_name, exact=True).first,
-    ]
+    visible_names = (
+        ("Analysis Desk", "Chat Assistant")
+        if page_name in {"Analysis Desk", "Chat Assistant"}
+        else (page_name,)
+    )
+    candidates = []
+    for visible_name in visible_names:
+        candidates.extend(
+            [
+                sidebar.get_by_text(visible_name, exact=True).first,
+                page.get_by_text(visible_name, exact=True).first,
+            ]
+        )
     for cand in candidates:
         try:
             cand.wait_for(timeout=timeout_ms)
@@ -263,18 +278,22 @@ def _select_navigation_page(page: Any, page_name: str, timeout_ms: int) -> bool:
 
 
 def _find_ask_button(page: Any, timeout_ms: int) -> Any:
-    candidates = [
-        page.get_by_role("button", name="Ask").first,
-        page.get_by_text("Ask", exact=True).first,
-        page.locator("button:has-text('Ask')").first,
-    ]
+    candidates = []
+    for label in ("Analyze", "Ask"):
+        candidates.extend(
+            [
+                page.get_by_role("button", name=label, exact=True).first,
+                page.get_by_text(label, exact=True).first,
+                page.locator(f"button:has-text('{label}')").first,
+            ]
+        )
     for cand in candidates:
         try:
             cand.wait_for(timeout=timeout_ms)
             return cand
         except Exception:
             continue
-    raise UIAuditError("query_submit_failed", "Ask button not found")
+    raise UIAuditError("query_submit_failed", "Analyze/Ask button not found")
 
 
 def _fill_textbox(page: Any, label: str, value: str, timeout_ms: int) -> None:
@@ -439,11 +458,23 @@ def run_ui_audit(
                     # Explicit render wait policy for Streamlit.
                     page.wait_for_timeout(1200)
                     page_text = main.inner_text(timeout=timeout_ms)
-                    has_sample_anchor = ("Sample Queries" in page_text) or ("Sample Query" in page_text)
-                    if (not has_sample_anchor) or ("Ask" not in page_text):
+                    is_analysis_desk = target_page in {"Analysis Desk", "Chat Assistant"}
+                    has_request_anchor = (
+                        "Analysis request" in page_text
+                        if is_analysis_desk
+                        else any(
+                            anchor in page_text
+                            for anchor in ("Sample analysis", "Sample Query", "Sample Queries")
+                        )
+                    )
+                    has_submit_anchor = any(
+                        anchor in page_text for anchor in ("Analyze", "Ask")
+                    )
+                    if (not has_request_anchor) or (not has_submit_anchor):
                         raise UIAuditError(
                             "render_timeout",
-                            "Core UI anchors (Sample Query/Sample Queries + Ask) not visible after render wait",
+                            "Core UI anchors (analysis request/sample selector + Analyze/Ask) "
+                            "not visible after render wait",
                         )
 
                     question_box = _find_question_input(page=page, timeout_ms=timeout_ms)

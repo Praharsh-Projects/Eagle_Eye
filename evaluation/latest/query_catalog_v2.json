@@ -1,0 +1,62 @@
+{
+  "generated_by": "eagle-eye-vnext",
+  "schema_version": "2.1",
+  "categories": {
+    "traffic_monitoring": [
+      {"query": "How many vessel arrivals were recorded at SEGOT in March 2022?", "expected_result_state": "COMPUTED"},
+      {"query": "Show daily arrival counts at LVVNT between 2022-02-01 and 2022-02-28.", "expected_result_state": "COMPUTED"},
+      {"query": "What was the peak arrival day at SEGOT in March 2022?", "expected_result_state": "COMPUTED"},
+      {"query": "Show cargo-ship arrivals at GDANSK during 2022-03.", "expected_result_state": "COMPUTED"},
+      {"query": "How many tanker arrivals were recorded at LVVNT between 2022-03-01 and 2022-03-10?", "expected_result_state": "COMPUTED"}
+    ],
+    "vessel_investigation": [
+      {"query": "Show suspicious AIS jumps for MMSI 212575000 on 2021-01-01.", "expected_result_state": "COMPUTED"},
+      {"query": "List AIS jump anomalies for MMSI 266232000 between 2021-01-01 and 2021-01-03.", "expected_result_state": "COMPUTED|NOT_COMPUTABLE"},
+      {"query": "Investigate unusual AIS jumps near SEGVX in March 2022.", "expected_result_state": "COMPUTED|RETRIEVAL_ONLY"},
+      {"query": "Any suspicious spoofing-like jumps for MMSI 246650000 in March 2022?", "expected_result_state": "COMPUTED|NOT_COMPUTABLE"},
+      {"query": "For MMSI 245286000, how long was the vessel in port on 2021-01-01?", "expected_result_state": "COMPUTED|NOT_COMPUTABLE"}
+    ],
+    "voyage_intelligence": [
+      {"query": "Resolve voyage for MMSI 245286000 departing 2021-01-01 and arriving 2021-01-02.", "expected_result_state": "COMPUTED|NOT_COMPUTABLE"},
+      {"query": "Show segment timeline for MMSI 266232000 in 2021-01.", "expected_result_state": "COMPUTED|NOT_COMPUTABLE"},
+      {"query": "Resolve voyage from SEGOT to LVVNT for MMSI 246694000.", "expected_result_state": "COMPUTED|NOT_COMPUTABLE"},
+      {"query": "Find voyage evidence for a vessel traveling from Poland to Karlskrona in March 2022.", "expected_result_state": "COMPUTED|NOT_COMPUTABLE"},
+      {"query": "Resolve voyage for unknown MMSI 999999999.", "expected_result_state": "NOT_COMPUTABLE"}
+    ],
+    "eta_delay": [
+      {"query": "What will congestion be at LVVNT on Friday, February 20, 2026?", "expected_result_state": "FORECAST_ONLY|COMPUTED"},
+      {"query": "Expected congestion at GDANSK on 2026-03-06?", "expected_result_state": "FORECAST_ONLY|COMPUTED"},
+      {"query": "Compare expected congestion next Friday between LVVNT and SEGOT.", "expected_result_state": "FORECAST_ONLY|COMPUTED"},
+      {"query": "Predict whether LUBECK is likely high congestion on 2026-02-20.", "expected_result_state": "FORECAST_ONLY|COMPUTED"},
+      {"query": "Will SEGOT likely remain above baseline congestion next Friday?", "expected_result_state": "FORECAST_ONLY|COMPUTED"}
+    ],
+    "port_pressure": [
+      {"query": "What is the port pressure index at SEGOT in March 2022?", "expected_result_state": "COMPUTED"},
+      {"query": "Show port pressure trend at LVVNT between 2022-02-01 and 2022-02-28.", "expected_result_state": "COMPUTED"},
+      {"query": "Compare port pressure between SEGOT and GDANSK in March 2022.", "expected_result_state": "COMPUTED"},
+      {"query": "Which days had the highest pressure at LVVNT in 2022-03?", "expected_result_state": "COMPUTED"},
+      {"query": "Is pressure at SEGVX above baseline on 2022-03-10?", "expected_result_state": "COMPUTED|NOT_COMPUTABLE"}
+    ],
+    "carbon_deterministic": [
+      {"query": "What are TTW emissions at SEGOT in March 2022 for CO2e, NOx, SOx, and PM?", "expected_result_state": "COMPUTED|COMPUTED_ZERO"},
+      {"query": "Show WTW CO2e emissions at LVVNT between 2022-02-01 and 2022-02-28.", "expected_result_state": "COMPUTED|COMPUTED_ZERO"},
+      {"query": "Report TTW CO2e and NOx at LVVNT for 2022-03 grouped by day.", "expected_result_state": "COMPUTED|COMPUTED_ZERO"},
+      {"query": "Compare TTW versus WTW CO2e totals at SETRG for March 2022.", "expected_result_state": "COMPUTED|COMPUTED_ZERO"},
+      {"query": "What are call-level emissions for MMSI 209468000 and call_id 209468000_2021-01-06T10-17-56_SETRG?", "expected_result_state": "COMPUTED|NOT_COMPUTABLE"}
+    ],
+    "carbon_retrieval_or_no_data": [
+      {"query": "Show WTW CO2e emissions at UNKNOWNPORT between 2022-02-01 and 2022-02-28.", "expected_result_state": "NOT_COMPUTABLE|RETRIEVAL_ONLY"},
+      {"query": "What are emissions at LVVNT for 2035-01-01 to 2035-01-31?", "expected_result_state": "NOT_COMPUTABLE|RETRIEVAL_ONLY"},
+      {"query": "Give carbon evidence IDs for port with no deterministic rows.", "expected_result_state": "NOT_COMPUTABLE|RETRIEVAL_ONLY"},
+      {"query": "Predict carbon emissions next Friday at SEGOT.", "expected_result_state": "FORECAST_ONLY|NOT_COMPUTABLE"},
+      {"query": "Estimate carbon emissions for a tanker in manoeuvring mode for 2 hours at 6 knots.", "expected_result_state": "COMPUTED|COMPUTED_ZERO|NOT_COMPUTABLE"}
+    ],
+    "unsupported_scope": [
+      {"query": "What is crane utilization at berth 3 in SEGOT today?", "expected_result_state": "UNSUPPORTED"},
+      {"query": "What is gate queue length at Port of Gdansk right now?", "expected_result_state": "UNSUPPORTED"},
+      {"query": "How many TEU were handled per hour at berth 5 yesterday?", "expected_result_state": "UNSUPPORTED"},
+      {"query": "What is yard occupancy percentage at terminal block C right now?", "expected_result_state": "UNSUPPORTED"},
+      {"query": "Show quay crane productivity at LVVNT in March 2022.", "expected_result_state": "UNSUPPORTED"}
+    ]
+  }
+}

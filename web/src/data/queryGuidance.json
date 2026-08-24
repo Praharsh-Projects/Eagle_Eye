@@ -1,0 +1,131 @@
+{
+  "Traffic Monitoring": {
+    "overview": "Use deterministic KPI aggregations for arrivals, busiest periods, and port comparisons.",
+    "what_to_enter": [
+      "A traffic question with port + date range (example: `How many arrivals at SEGOT in March 2022?`).",
+      "Optional filters: port, date range, vessel type, anomaly flag."
+    ],
+    "expected_output": [
+      "Deterministic arrivals/count metrics (`Computed`).",
+      "Evidence rows and chart for the selected scope.",
+      "Source provenance and retrieval details (if vector retrieval is active)."
+    ],
+    "test_steps": [
+      "Sample input: `How many vessel arrivals were recorded at SEGOT in March 2022?`",
+      "Optional filters: port=`SEGOT`, date range=`2022-03-01` to `2022-03-31`.",
+      "Expected: deterministic arrivals count, evidence rows, and a time-series chart."
+    ],
+    "calculation": [
+      "Data source: `arrivals_daily.parquet` and `arrivals_hourly.parquet`.",
+      "Method: pandas groupby/filter over deterministic KPI tables.",
+      "Evidence: retrieved vector rows are explanatory; numeric truth is from KPI aggregation."
+    ]
+  },
+  "Vessel Investigation": {
+    "overview": "Inspect a single vessel (MMSI-based) for dwell behavior and AIS jump anomalies.",
+    "what_to_enter": [
+      "A vessel-focused question with MMSI and date/window.",
+      "Optional filters: date range and anomaly flag."
+    ],
+    "expected_output": [
+      "Detected anomalies/dwell evidence for matching vessel rows.",
+      "Event lines with timestamps and movement context.",
+      "Clear no-data response when MMSI/date scope has no rows."
+    ],
+    "test_steps": [
+      "Sample input: `Show suspicious AIS jumps for MMSI 246521000 on 2022-03-10.`",
+      "Optional filters: date range around the target day.",
+      "Expected: anomaly count + event table with displacement/speed evidence when available."
+    ],
+    "calculation": [
+      "Data source: `events.parquet` (preferred) or indexed metadata.",
+      "Method: deterministic screening rules over chronological AIS rows.",
+      "Threshold logic: large displacement in short time window / implied speed rule."
+    ]
+  },
+  "ETA & Delay": {
+    "overview": "Monitor fresh vessel-reported destinations, ETAs, positions, speeds, ETA revisions, and signal quality through a Sweden-first Baltic operational watch.",
+    "what_to_enter": [
+      "Ask for a shift handover, inbound watchlist, destination load, exception check, or a specific vessel by name, MMSI, or IMO.",
+      "Use a current UTC window of 6, 12, 24, or at most 48 hours. Sweden is the default scope; named Baltic ports can be combined."
+    ],
+    "expected_output": [
+      "A decision brief followed by the first actionable vessels, exact observation times, matching maps or ETA rails, and the complete source table.",
+      "ETA revisions and low-speed cases are monitoring signals, not confirmed delay or an official port schedule.",
+      "A specific warming, stale, unavailable, or unsupported reason when the requested broadcast fields do not pass freshness checks."
+    ],
+    "test_steps": [
+      "Sample input: `Prepare a Sweden-bound shift handover for the next 12 hours: due soon, low-speed exceptions, ETA changes, and stale signals.`",
+      "Optional filters: select a supported port or vessel identifier to narrow the live watch.",
+      "Expected: current UTC observations, matched and displayed totals, source health, actionable rows, matching charts, and no historical substitution."
+    ],
+    "calculation": [
+      "Numeric authority: normalized AISStream position and ship-static broadcasts joined by MMSI.",
+      "Freshness boundary: requested position, destination, and ETA fields must independently pass the current-source checks.",
+      "ETA change compares the same vessel's validated reported ETA snapshots; it is not a prediction or confirmed delay.",
+      "AIS coverage is non-exhaustive. This page never substitutes historical congestion calculations for live evidence."
+    ]
+  },
+  "Port Pressure": {
+    "overview": "Assess operational pressure in port time windows using deterministic index calculations and arrivals signals.",
+    "what_to_enter": [
+      "A pressure query with port and date range (example: `pressure index at SEGOT in March 2022`).",
+      "Optional: vessel type filter for lane-specific pressure view."
+    ],
+    "expected_output": [
+      "Pressure/congestion index trend (`Computed`).",
+      "Evidence rows backing the pressure calculation.",
+      "Operational recommendation bullets tied to computed drivers."
+    ],
+    "test_steps": [
+      "Sample input: `What is the port pressure index at SEGOT in March 2022?`",
+      "Optional filters: add vessel type and date range to narrow pressure scope.",
+      "Expected: pressure index trend, evidence rows, and pressure-focused recommendations."
+    ],
+    "calculation": [
+      "Data source: `congestion_daily.parquet`, `arrivals_daily.parquet`, `arrivals_hourly.parquet`.",
+      "Method: deterministic pressure-index calculation over filtered rows.",
+      "Output unit: pressure is an index (dimensionless)."
+    ]
+  },
+  "Carbon Emissions": {
+    "overview": "Compute deterministic carbon outputs when carbon inventory rows match the query scope.",
+    "what_to_enter": [
+      "A carbon query with boundary keyword (`TTW`/`WTW`), pollutants, and scope (port/date or mmsi+call_id).",
+      "For call-level output, include both MMSI and call_id."
+    ],
+    "expected_output": [
+      "Carbon metrics, tables, and charts when structured rows match the scope.",
+      "A direct no-data reason when no matching finite rows exist.",
+      "Structured carbon evidence and any retrieved supporting traffic evidence."
+    ],
+    "test_steps": [
+      "Sample input: `Report TTW CO2e and NOx at LVVNT for 2022-03 grouped by day.`",
+      "Try boundary keywords (`TTW`/`WTW`) and pollutants (`CO2`, `CH4`, `N2O`, `CO2e`, `NOx`, `SOx`, `PM`).",
+      "Expected: carbon metrics and charts, or a direct reason when no matching rows exist."
+    ],
+    "calculation": [
+      "Data source: `carbon_segments.parquet`, `carbon_emissions_segment.parquet`, `carbon_emissions_daily_port.parquet`, `carbon_emissions_call.parquet`.",
+      "Method: deterministic sums over structurally valid matched segment/call rows.",
+      "Finite zero values remain distinct from a scope with no matching data."
+    ]
+  },
+  "Unsupported Scope": {
+    "overview": "Validate refusal behavior for requests outside dataset capability (berth cranes, gate queues, TEU throughput).",
+    "what_to_enter": [
+      "An intentionally unsupported operations query (crane utilization, gate queue, TEU throughput)."
+    ],
+    "expected_output": [
+      "Explicit unsupported refusal (`UNSUPPORTED`).",
+      "No fabricated numeric output."
+    ],
+    "test_steps": [
+      "Sample input: `What is crane utilization at berth 3 in SEGOT today?`",
+      "Expected: explicit unsupported response (no fabricated numeric output)."
+    ],
+    "calculation": [
+      "Rule: intent classifier maps unsupported operational asks to refusal path.",
+      "Data limitations are shown directly to avoid unsupported claims."
+    ]
+  }
+}
